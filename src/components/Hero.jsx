@@ -60,7 +60,7 @@ export function Hero({ goTo, compact = false }) {
               <div className="mt-4 flex flex-col gap-2 text-[15px] text-on-brand/85 sm:flex-row sm:flex-wrap sm:gap-x-5 sm:text-sm">
                 <span className="inline-flex items-start gap-2">
                   <CalendarClock size={17} className="mt-0.5 shrink-0 text-accent" />
-                  {fmt.tarikhHari(next.tarikh)}
+                  <span data-testid="hero-when">{fmt.tarikhHari(next.tarikh)}{next.masa ? ` · ${fmt.masa(next.masa)}` : ''}</span>
                 </span>
                 {next.panel && (
                   <span className="inline-flex items-start gap-2 wrap-anywhere"><Users size={17} className="mt-0.5 shrink-0 text-accent" /><span dir="auto">{next.panel}</span></span>

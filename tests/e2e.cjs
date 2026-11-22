@@ -109,7 +109,7 @@ const iso = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return `$
 const hariOfISO = (s) => { const [y, m, d] = s.split('-').map(Number); return HARI[new Date(y, m - 1, d).getDay()]; };
 const isDatedStr = (t) => /^\d{4}-\d{2}-\d{2}/.test(String(t || ''));
 
-async function addPanel(page, { tajuk, nama, tarikh, tbd = false }) {
+async function addPanel(page, { tajuk, nama, tarikh, masa, tbd = false }) {
   await go(page, 'panel');
   await page.getByRole('button', { name: /Tambah Panel/ }).click();
   await page.fill('#f-tajuk', tajuk);
@@ -119,8 +119,10 @@ async function addPanel(page, { tajuk, nama, tarikh, tbd = false }) {
     assert.equal(await page.locator('#f-tarikh').isDisabled(), true, 'date disabled when Belum Ditentukan');
   } else {
     await page.fill('#f-tarikh', tarikh);
-    // derived Bahasa Melayu day shown live in the form
+    if (masa) await page.fill('#f-masa', masa);
+    // derived Bahasa Melayu day (and time) shown live in the form
     assert.match(await page.getByTestId('hari-preview').innerText(), new RegExp(`^${hariOfISO(tarikh)}, `));
+    if (masa) assert.match(await page.getByTestId('hari-preview').innerText(), / · \d{1,2}:\d{2} (pagi|tengah hari|petang|malam)$/);
   }
   await page.getByRole('dialog').getByRole('button', { name: 'Simpan' }).click();
   await toast(page, /Panel disimpan/);
@@ -141,17 +143,20 @@ async function scheduleSyncFlow(page, tag, { checkHero = false } = {}) {
   const d5 = iso(5);
   const T = `Sync ${tag} Jadual`;
   // 1. dated panel + 2nd panelist on same tajuk/date (should merge into ONE slot)
-  await addPanel(page, { tajuk: T, nama: `Ustaz ${tag} A`, tarikh: d5 });
+  await addPanel(page, { tajuk: T, nama: `Ustaz ${tag} A`, tarikh: d5, masa: '20:30' });
   await addPanel(page, { tajuk: T, nama: `Dr. ${tag} B`, tarikh: d5 });
   const rowsA = sheet(rt, 'PANEL').filter((r) => r.tajuk === T);
   assert.equal(rowsA.length, 2);
   assert.ok(rowsA.every((r) => r.tarikh === d5), 'tarikh stored as ISO in the Sheet');
+  assert.equal(rowsA.find((r) => r.nama_panel === `Ustaz ${tag} A`).masa, '20:30', 'masa stored as HH:mm');
+  assert.equal(rowsA.find((r) => r.nama_panel === `Dr. ${tag} B`).masa, '', 'no time given -> empty');
   // 2. Belum Ditentukan
   await addPanel(page, { tajuk: `TBD ${tag} Tajuk`, nama: `Ustaz ${tag} C`, tbd: true });
   assert.equal(sheet(rt, 'PANEL').find((r) => r.nama_panel === `Ustaz ${tag} C`).tarikh, 'Belum Ditentukan');
   await page.locator('li', { hasText: `Ustaz ${tag} C` }).getByText('Belum Ditentukan').waitFor();
   const dated = page.locator('li', { hasText: `Ustaz ${tag} A` });
   assert.match(await dated.innerText(), new RegExp(hariOfISO(d5)));
+  assert.equal(await dated.getByTestId('row-masa').innerText(), '· 8:30 malam');
   // 3. validation: neither date nor Belum Ditentukan -> modal stays open, nothing saved
   await page.getByRole('button', { name: /Tambah Panel/ }).click();
   await page.fill('#f-tajuk', `Invalid ${tag}`);
@@ -168,6 +173,7 @@ async function scheduleSyncFlow(page, tag, { checkHero = false } = {}) {
   assert.equal(mine.length, 1, 'two panelists -> one slot');
   assert.equal(mine[0].panel, `Ustaz ${tag} A & Dr. ${tag} B`);
   assert.ok(mine[0].text.includes(hariOfISO(d5)), 'hari on the card');
+  assert.ok(mine[0].text.includes('8:30 malam'), 'shooting time on the merged slot');
   assert.ok(!slots.some((x) => x.text.includes(`TBD ${tag}`)), 'Belum Ditentukan not in Upcoming');
   const dates = slots.map((x) => x.id.slice(0, 10));
   assert.deepEqual(dates, [...dates].sort(), 'sorted by nearest date');
@@ -206,6 +212,7 @@ async function scheduleSyncFlow(page, tag, { checkHero = false } = {}) {
       await page.locator(`li[data-panel-id="${r.id}"]`).getByRole('button', { name: 'Edit' }).click();
       await page.uncheck('#f-tbd');
       await page.fill('#f-tarikh', first.tarikh);
+      if (r.masa) await page.fill('#f-masa', r.masa); // "Belum Ditentukan" cleared the time; restore it
       await page.getByRole('dialog').getByRole('button', { name: 'Simpan' }).click();
       await toast(page, /Panel disimpan/);
       await synced(page);
@@ -264,6 +271,7 @@ async function scheduleSyncFlow(page, tag, { checkHero = false } = {}) {
       await synced(page);
       await page.getByRole('heading', { level: 1 }).filter({ hasText: 'Mengurus Hati' }).waitFor();
       assert.equal(await page.locator('text=Demo').count(), 0, 'should not be in demo mode');
+      assert.match(await page.getByTestId('hero-when').innerText(), / · 9:00 malam$/, 'hero shows date + time');
     });
 
     await step('Upcoming (public): no "Salin Info WA" button, no card footer, no mention in copy', async () => {
@@ -392,6 +400,7 @@ async function scheduleSyncFlow(page, tag, { checkHero = false } = {}) {
       await toast(page, /disalin/i);
       const clip = await page.evaluate(() => navigator.clipboard.readText());
       assert.match(clip, /\*Tajuk:\* Mengurus Hati/);
+      assert.match(clip, /\*Masa:\* 9:00 malam/);
       assert.match(clip, /\*Hari\/Tarikh:\* \w+, \d+ \w+ \d{4}/);
       assert.match(clip, new RegExp(`${APP_PORT}/#panduan`));
     });
@@ -671,6 +680,7 @@ async function scheduleSyncFlow(page, tag, { checkHero = false } = {}) {
       const slots = await p.locator('[data-slot]').evaluateAll((els) => els.map((e) => ({ id: e.getAttribute('data-slot'), text: e.innerText, h3: e.querySelector('h3').innerText })));
       assert.ok(slots.length > 0);
       for (const sl of slots) assert.ok(sl.text.includes(dayAr(sl.id.slice(0, 10))), `Arabic day on ${sl.id}`);
+      assert.equal(await p.locator('[data-slot]').first().getByTestId('slot-masa').innerText(), '9:00 مساءً');
       const firstPanel = sheet(rt, 'PANEL').find((r) => r.tajuk.trim() === slots[0].h3.trim());
       assert.ok(firstPanel, 'card title is the Sheet value verbatim');
       // typography: Tajawal for UI, no letter-spacing on Arabic labels, Amiri kept for Quranic text

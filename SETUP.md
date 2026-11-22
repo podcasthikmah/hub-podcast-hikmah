@@ -26,7 +26,7 @@ Nama tab mesti **HURUF BESAR** dan sama seperti di bawah. Baris 1 ialah header.
 | Tab | Header lajur (A → …) |
 |---|---|
 | `UPCOMING` | `id` · `order` · `hari` · `tarikh` · `masa` · `tajuk` · `panel` *(lama — tidak digunakan lagi, boleh dibiarkan)* |
-| `PANEL` | `id` · `tajuk` · `nama_panel` · `tarikh` |
+| `PANEL` | `id` · `tajuk` · `nama_panel` · `tarikh` · `masa` |
 | `PANDUAN` | `id` · `order` · `kategori` · `tajuk` · `keterangan` · `gdrive_url` |
 | `PERINGATAN` | `id` · `order` · `petikan` · `arab` · `konteks` |
 | `KITAB` | `id` · `nama_kitab` · `bilangan` |
@@ -35,7 +35,7 @@ Nama tab mesti **HURUF BESAR** dan sama seperti di bawah. Baris 1 ialah header.
 
 Nota:
 - `tarikh` dalam format **`YYYY-MM-DD`** (contoh `2026-12-04`). `setupSheets` sudah tetapkan lajur sebagai *Plain text* supaya Sheets tidak tukar format tarikh.
-- **`PANEL` ialah sumber utama jadual.** Upcoming Podcast dan banner Hero dijana secara automatik daripada baris `PANEL` yang bertarikh (hari ini dan ke hadapan, tarikh paling dekat dahulu). Satu baris bagi setiap panel; baris dengan `tajuk` dan `tarikh` yang sama digabungkan menjadi satu slot. `PANEL.tarikh` ialah `YYYY-MM-DD` atau teks `Belum Ditentukan` (tidak dipaparkan di Upcoming). Hari (Isnin, Selasa, …) dikira daripada tarikh dan tidak perlu disimpan.
+- **`PANEL` ialah sumber utama jadual.** Upcoming Podcast dan banner Hero dijana secara automatik daripada baris `PANEL` yang bertarikh (hari ini dan ke hadapan, tarikh paling dekat dahulu). Satu baris bagi setiap panel; baris dengan `tajuk` dan `tarikh` yang sama digabungkan menjadi satu slot. `PANEL.tarikh` ialah `YYYY-MM-DD` atau teks `Belum Ditentukan` (tidak dipaparkan di Upcoming). Hari (Isnin, Selasa, …) dikira daripada tarikh dan tidak perlu disimpan. `PANEL.masa` ialah waktu shooting dalam format 24 jam `HH:mm` (cth. `21:00`), pilihan; dipaparkan sebagai "9:00 malam".
 - `Code.gs` menambah lajur yang hilang secara automatik (cth. `tarikh` pada tab `PANEL` yang dicipta secara manual), jadi tarikh tidak akan tercicir.
 - `PANDUAN.kategori` ada dua nilai: `PANEL` untuk dokumen di seksyen Panduan Panel, dan `SKRIP_PROMOSI` untuk kad skrip di seksyen Promosi Kitab.
 - `CADANGAN.status` ialah `BELUM` atau `SELESAI`.

@@ -69,7 +69,7 @@ async function seedStress() {
   ];
   // LIST PANEL drives Upcoming: one row per panelist; same tajuk+date merge into one slot.
   for (const [n, tajuk, panel] of up) {
-    for (const nama of panel.split(/, | & /)) await post({ action: 'create', sheet: 'PANEL', item: { tarikh: d(n), tajuk, nama_panel: nama } });
+    for (const nama of panel.split(/, | & /)) await post({ action: 'create', sheet: 'PANEL', item: { tarikh: d(n), tajuk, nama_panel: nama, masa: n === 10 ? '14:30' : '21:00' } });
   }
   await post({ action: 'create', sheet: 'PANEL', item: { tarikh: 'Belum Ditentukan', tajuk: 'Rezeki & Tawakal: Antara Usaha dan Doa', nama_panel: 'Ustaz Zulkifli Hassan' } });
   for (const [t, p] of [['Mengurus Hati di Era Media Sosial: Antara Riya\' dan Ikhlas', 'Dr. Ahmad Fauzi bin Yusof Al-Hafiz'], ['Solat Khusyuk', 'Ustaz Hafiz Rahman']]) await post({ action: 'create', sheet: 'PANEL', item: { tajuk: t, nama_panel: p, tarikh: d(-14) } });

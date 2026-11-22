@@ -6,11 +6,11 @@ export function buildSeed() {
     // LIST PANEL is the schedule source of truth; UPCOMING is derived from it (see lib/schedule.js).
     UPCOMING: [],
     PANEL: [
-      { id: 'pn1', tajuk: 'Mengurus Hati di Era Media Sosial', nama_panel: 'Ustaz Hafiz Rahman', tarikh: addDays(3) },
-      { id: 'pn2', tajuk: 'Mengurus Hati di Era Media Sosial', nama_panel: 'Dr. Nurul Huda Ismail', tarikh: addDays(3) },
-      { id: 'pn3', tajuk: "Adab Penuntut Ilmu: Belajar dari Kitab Ta'lim al-Muta'allim", nama_panel: 'Ustaz Amirul Hakim', tarikh: addDays(10) },
-      { id: 'pn4', tajuk: "Adab Penuntut Ilmu: Belajar dari Kitab Ta'lim al-Muta'allim", nama_panel: 'Sdr. Faiz Azman', tarikh: addDays(10) },
-      { id: 'pn5', tajuk: 'Keluarga Sakinah: Komunikasi Suami Isteri', nama_panel: 'Ustazah Siti Aisyah', tarikh: addDays(17) },
+      { id: 'pn1', tajuk: 'Mengurus Hati di Era Media Sosial', nama_panel: 'Ustaz Hafiz Rahman', tarikh: addDays(3), masa: '21:00' },
+      { id: 'pn2', tajuk: 'Mengurus Hati di Era Media Sosial', nama_panel: 'Dr. Nurul Huda Ismail', tarikh: addDays(3), masa: '21:00' },
+      { id: 'pn3', tajuk: "Adab Penuntut Ilmu: Belajar dari Kitab Ta'lim al-Muta'allim", nama_panel: 'Ustaz Amirul Hakim', tarikh: addDays(10), masa: '20:30' },
+      { id: 'pn4', tajuk: "Adab Penuntut Ilmu: Belajar dari Kitab Ta'lim al-Muta'allim", nama_panel: 'Sdr. Faiz Azman', tarikh: addDays(10), masa: '20:30' },
+      { id: 'pn5', tajuk: 'Keluarga Sakinah: Komunikasi Suami Isteri', nama_panel: 'Ustazah Siti Aisyah', tarikh: addDays(17), masa: '21:00' },
       { id: 'pn11', tajuk: 'Rezeki & Tawakal: Antara Usaha dan Doa', nama_panel: 'Ustaz Zulkifli Hassan', tarikh: 'Belum Ditentukan' },
       { id: 'pn6', tajuk: 'Hikmah di Sebalik Ujian', nama_panel: 'Ustaz Muhammad Syafiq', tarikh: addDays(-7) },
       { id: 'pn7', tajuk: 'Hikmah di Sebalik Ujian', nama_panel: 'Pn. Rohani Abdullah', tarikh: addDays(-7) },

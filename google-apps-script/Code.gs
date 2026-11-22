@@ -17,7 +17,7 @@
 // ---- Schema (MUST match src/lib/schema.js) ---------------------------------
 var HEADERS = {
   UPCOMING:   ['id', 'order', 'hari', 'tarikh', 'masa', 'tajuk', 'panel'],
-  PANEL:      ['id', 'tajuk', 'nama_panel', 'tarikh'],
+  PANEL:      ['id', 'tajuk', 'nama_panel', 'tarikh', 'masa'],
   PANDUAN:    ['id', 'order', 'kategori', 'tajuk', 'keterangan', 'gdrive_url'],
   PERINGATAN: ['id', 'order', 'petikan', 'arab', 'konteks'],
   KITAB:      ['id', 'nama_kitab', 'bilangan'],
@@ -131,7 +131,11 @@ function readSheet_(name) {
     header.forEach(function (h, c) {
       if (!h) return;
       var v = row[c];
-      if (v instanceof Date) v = Utilities.formatDate(v, tz, h === 'created_at' ? "yyyy-MM-dd'T'HH:mm:ss" : 'yyyy-MM-dd');
+      if (v instanceof Date) {
+        // A time typed into a non-text cell (e.g. "21:00") comes back as a 1899-12-30 date: keep the time.
+        if (v.getFullYear() < 1900 || h === 'masa') v = Utilities.formatDate(v, tz, 'HH:mm');
+        else v = Utilities.formatDate(v, tz, h === 'created_at' ? "yyyy-MM-dd'T'HH:mm:ss" : 'yyyy-MM-dd');
+      }
       if (NUMERIC_COLS[h]) v = Number(v) || 0;
       else v = v === null || v === undefined ? '' : String(v);
       obj[h] = v;
@@ -389,7 +393,7 @@ function seedSampleData() {
     sh.appendRow(HEADERS[name].map(function (h) { return cell_(h, obj[h]); }));
   };
   add('UPCOMING', { order: 1, hari: '', tarikh: t, masa: '9:00 malam', tajuk: 'Mengurus Hati di Era Media Sosial', panel: 'Ustaz Hafiz Rahman & Dr. Nurul Huda' });
-  add('PANEL', { tajuk: 'Mengurus Hati di Era Media Sosial', nama_panel: 'Ustaz Hafiz Rahman', tarikh: t });
+  add('PANEL', { tajuk: 'Mengurus Hati di Era Media Sosial', nama_panel: 'Ustaz Hafiz Rahman', tarikh: t, masa: '21:00' });
   add('PANDUAN', { order: 1, kategori: 'PANEL', tajuk: 'Panduan Lengkap Panel Jemputan', keterangan: 'Aliran rakaman & persediaan.', gdrive_url: 'https://drive.google.com/file/d/GANTI_ID/view' });
   add('PANDUAN', { order: 2, kategori: 'SKRIP_PROMOSI', tajuk: 'Contoh Skrip Promosi Kitab', keterangan: 'Skrip 60–90 saat.', gdrive_url: 'https://drive.google.com/file/d/GANTI_ID/view' });
   add('PERINGATAN', { order: 1, petikan: 'Niatkan setiap perkongsian kerana Allah.', arab: 'إِنَّمَا الأَعْمَالُ بِالنِّيَّاتِ', konteks: 'Taklimat Panel' });
