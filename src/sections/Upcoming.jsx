@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { ArrowRight, CalendarDays, Check, Copy, Users } from 'lucide-react';
+import { ArrowRight, CalendarDays, Check, Clock, Copy, Users } from 'lucide-react';
 import { useData } from '../lib/store.jsx';
 import { copyText, cx, daysUntil, parseISO } from '../lib/utils.js';
 import { useI18n } from '../lib/i18n.jsx';
@@ -89,6 +89,11 @@ export default function Upcoming() {
                         {fmt.relative(r.tarikh)}
                       </span>
                       <span className="text-[13px] font-medium text-muted">{fmt.hari(r.tarikh)}</span>
+                      {r.masa && (
+                        <span data-testid="slot-masa" className="inline-flex items-center gap-1 text-[13px] font-semibold text-primary">
+                          <Clock size={13} /> {fmt.masa(r.masa)}
+                        </span>
+                      )}
                     </div>
                     <h3 dir="auto" className="text-[17px] font-bold leading-snug text-ink wrap-anywhere sm:text-base">{r.tajuk}</h3>
                     <p className="mt-1.5 flex items-start gap-1.5 text-[15px] leading-snug text-muted wrap-anywhere sm:text-sm">

@@ -148,9 +148,8 @@ const test = async (name, fn) => { await fn(); passed++; console.log('  ✓', na
       assert.equal(d.PANEL.find((r) => r.id === 'manual1').tarikh, '2026-12-25');
       const m = d.UPCOMING.find((r) => r.id === 'manual2');
       assert.equal(m.tarikh, '2026-12-26');
-      // KNOWN GAP (Code.gs is frozen in this PR): a time typed into a non-text cell comes back as
-      // '1899-12-30'. Fix = format Dates with year < 1900 as 'HH:mm' in readSheet_().
-      assert.ok(typeof m.masa === 'string');
+      // a time typed into a non-text cell is a 1899-12-30 Date in Sheets -> must read back as HH:mm
+      assert.equal(m.masa, '21:00');
     });
 
     await test('PANEL.tarikh: ISO date and "Belum Ditentukan" round-trip unchanged', async () => {
@@ -168,6 +167,28 @@ const test = async (name, fn) => { await fn(); passed++; console.log('  ✓', na
       // unknown UI-only fields (e.g. `tbd`) are never written as columns
       ok(await post({ action: 'create', sheet: 'PANEL', pin: PIN, item: { tajuk: 'X', nama_panel: 'Y', tarikh: '2026-12-09', tbd: false } }));
       assert.ok(!rt.sheets.get('PANEL').data[0].includes('tbd'));
+    });
+
+    await test('PANEL.masa: time round-trips; a manually typed time cell reads back as HH:mm', async () => {
+      const r = ok(await post({ action: 'create', sheet: 'PANEL', pin: PIN, item: { tajuk: 'Masa', nama_panel: 'Ustaz M', tarikh: '2026-12-05', masa: '20:30' } }));
+      assert.equal(ok(await get()).PANEL.find((x) => x.id === r.id).masa, '20:30');
+      ok(await post({ action: 'update', sheet: 'PANEL', id: r.id, pin: PIN, patch: { masa: '09:15' } }));
+      assert.equal(ok(await get()).PANEL.find((x) => x.id === r.id).masa, '09:15');
+      const D = (...a) => require('node:vm').runInContext(`new Date(${a.join(',')})`, rt.gs);
+      const sh = rt.sheets.get('PANEL');
+      const col = sh.data[0].indexOf('masa');
+      sh.data.find((row) => row[0] === r.id)[col] = D(1899, 11, 30, 21, 0); // Sheets' time-only value
+      assert.equal(ok(await get()).PANEL.find((x) => x.id === r.id).masa, '21:00');
+    });
+
+    await test('self-healing headers: an existing PANEL tab without "masa" gets the column, times persist', async () => {
+      const sh = rt.sheets.get('PANEL');
+      const col = sh.data[0].indexOf('masa');
+      sh.data.forEach((row) => row.splice(col, 1)); // the live Sheet before this change
+      ok(await get());
+      assert.equal(sh.data[0].filter((h) => h === 'masa').length, 1);
+      const r = ok(await post({ action: 'create', sheet: 'PANEL', pin: PIN, item: { tajuk: 'Heal M', nama_panel: 'Ustaz HM', tarikh: '2026-12-06', masa: '21:00' } }));
+      assert.equal(ok(await get()).PANEL.find((x) => x.id === r.id).masa, '21:00');
     });
 
     await test('self-healing headers: PANEL tab missing "tarikh" gets it back and dates persist', async () => {

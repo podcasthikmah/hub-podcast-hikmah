@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { CalendarClock, CalendarDays, Search, UserRound, Users, X } from 'lucide-react';
 import { useData } from '../lib/store.jsx';
 import { cx, daysUntil } from '../lib/utils.js';
-import { TBD, isDated } from '../lib/schedule.js';
+import { TBD, isDated, normalizeMasa } from '../lib/schedule.js';
 import { useI18n } from '../lib/i18n.jsx';
 import { AddButton, ConfirmModal, Empty, FormModal, RowActions, SectionHeader, useEditor } from '../components/ui.jsx';
 
@@ -17,7 +17,7 @@ function HariPreview({ values }) {
   return (
     <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-btn bg-brand/5 px-3 py-2 text-[13px] dark:bg-accent/10">
       <CalendarDays size={15} className="shrink-0 text-primary" />
-      <span className="font-semibold text-ink" data-testid="hari-preview">{fmt.tarikhHari(values.tarikh)}</span>
+      <span className="font-semibold text-ink" data-testid="hari-preview">{fmt.tarikhHari(values.tarikh)}{normalizeMasa(values.masa) ? ` · ${fmt.masa(values.masa)}` : ''}</span>
       {n !== null && <span className="text-muted">· {n < 0 ? t('panel.preview.past') : `${fmt.relative(values.tarikh)} · ${t('panel.preview.shown')}`}</span>}
     </p>
   );
@@ -33,6 +33,10 @@ const fields = (t) => [
     name: 'tarikh', label: t('panel.f.tarikh'), type: 'date',
     requiredWhen: (v) => !v.tbd,
     disabledWhen: (v) => Boolean(v.tbd),
+  },
+  {
+    name: 'masa', label: t('panel.f.masa'), type: 'time', help: t('panel.f.masaHelp'),
+    disabledWhen: (v) => Boolean(v.tbd),
     preview: (v) => <HariPreview values={v} />,
   },
   { name: 'tbd', label: t('panel.f.tbd'), type: 'checkbox', help: t('panel.f.tbdHelp') },
@@ -47,7 +51,7 @@ function rank(r) {
   return n !== null && n >= 0 ? 0 : 2;
 }
 
-function DateLine({ tarikh }) {
+function DateLine({ tarikh, masa }) {
   const { t, fmt } = useI18n();
   if (!isDated(tarikh)) {
     return (
@@ -62,6 +66,7 @@ function DateLine({ tarikh }) {
     <p className={cx('mt-1 flex flex-wrap items-center gap-x-1.5 text-[13px] font-medium', future ? 'text-primary' : 'text-muted')}>
       <CalendarDays size={14} className="shrink-0" />
       <span>{fmt.tarikhHari(tarikh, { short: true })}</span>
+      {normalizeMasa(masa) && <span data-testid="row-masa">· {fmt.masa(masa)}</span>}
       {future && <span className="font-normal text-muted">· {fmt.relative(tarikh)}</span>}
     </p>
   );
@@ -97,7 +102,7 @@ export default function PanelList() {
   const openEditor = (r) =>
     setEditing(
       r?.id
-        ? { ...r, tarikh: isDated(r.tarikh) ? String(r.tarikh).slice(0, 10) : '', tbd: !isDated(r.tarikh) }
+        ? { ...r, tarikh: isDated(r.tarikh) ? String(r.tarikh).slice(0, 10) : '', masa: normalizeMasa(r.masa), tbd: !isDated(r.tarikh) }
         : { tbd: false },
     );
 
@@ -107,7 +112,7 @@ export default function PanelList() {
       return false;
     }
     // Only the sheet columns go to the backend; `tbd` is UI state.
-    const item = { tajuk: String(v.tajuk || '').trim(), nama_panel: String(v.nama_panel || '').trim(), tarikh: v.tbd ? TBD : v.tarikh };
+    const item = { tajuk: String(v.tajuk || '').trim(), nama_panel: String(v.nama_panel || '').trim(), tarikh: v.tbd ? TBD : v.tarikh, masa: v.tbd ? '' : normalizeMasa(v.masa) };
     const n = v.tbd ? null : daysUntil(v.tarikh);
     const msg = v.tbd ? t('panel.savedTbd') : n !== null && n >= 0 ? t('panel.savedUp') : t('panel.savedPast');
     return editing?.id ? update('PANEL', editing.id, item, msg) : create('PANEL', item, msg);
@@ -157,7 +162,7 @@ export default function PanelList() {
               <div className="min-w-0 flex-1">
                 <p dir="auto" className="line-clamp-2 font-semibold leading-snug text-ink wrap-anywhere">{r.nama_panel}</p>
                 <p dir="auto" className="mt-0.5 line-clamp-2 text-sm leading-snug text-muted wrap-anywhere">{r.tajuk}</p>
-                <DateLine tarikh={r.tarikh} />
+                <DateLine tarikh={r.tarikh} masa={r.masa} />
               </div>
               {isAdmin && <RowActions onEdit={() => openEditor(r)} onDelete={() => setDeleting(r)} />}
             </li>

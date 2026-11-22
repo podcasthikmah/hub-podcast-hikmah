@@ -7,6 +7,7 @@
  */
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { parseISO, daysUntil } from './utils.js';
+import { formatMasa } from './schedule.js';
 
 export const LANGS = ['ms', 'ar'];
 const KEY = 'hph_lang';
@@ -107,7 +108,7 @@ export const DICT = {
     'panel.f.tajuk': 'Tajuk', 'panel.f.tajukPh': 'Tajuk episod',
     'panel.f.nama': 'Nama Panel', 'panel.f.namaPh': 'cth. Ustaz Hafiz Rahman',
     'panel.f.namaHelp': 'Satu rekod bagi setiap panel. Panel dengan tajuk & tarikh yang sama digabungkan dalam satu slot Upcoming.',
-    'panel.f.tarikh': 'Tarikh', 'panel.f.tbd': 'Belum Ditentukan', 'panel.f.tbdHelp': 'Tandakan jika tarikh rakaman belum ditetapkan.',
+    'panel.f.tarikh': 'Tarikh', 'panel.f.masa': 'Waktu Shooting (pilihan)', 'panel.f.masaHelp': 'Waktu rakaman. Dipaparkan bersama tarikh di Upcoming dan mesej WhatsApp.', 'panel.f.tbd': 'Belum Ditentukan', 'panel.f.tbdHelp': 'Tandakan jika tarikh rakaman belum ditetapkan.',
     'panel.preview.tbd': 'Tidak akan dipaparkan di Upcoming sehingga tarikh ditetapkan.',
     'panel.preview.past': 'Telah berlalu (arkib)', 'panel.preview.shown': 'dipaparkan di Upcoming',
     'panel.needDate': 'Sila pilih tarikh atau tandakan "Belum Ditentukan"',
@@ -230,7 +231,7 @@ export const DICT = {
     'panel.f.tajuk': 'العنوان', 'panel.f.tajukPh': 'عنوان الحلقة',
     'panel.f.nama': 'اسم الضيف', 'panel.f.namaPh': 'مثال: الأستاذ حافظ رحمن',
     'panel.f.namaHelp': 'سجل واحد لكل ضيف. يُدمج الضيوف ذوو العنوان والتاريخ نفسيهما في موعد واحد.',
-    'panel.f.tarikh': 'التاريخ', 'panel.f.tbd': 'غير محدد', 'panel.f.tbdHelp': 'حدّد هذا الخيار إذا لم يُحدَّد تاريخ التسجيل بعد.',
+    'panel.f.tarikh': 'التاريخ', 'panel.f.masa': 'وقت التصوير (اختياري)', 'panel.f.masaHelp': 'وقت التسجيل. يُعرض مع التاريخ في البودكاست القادم ورسالة واتساب.', 'panel.f.tbd': 'غير محدد', 'panel.f.tbdHelp': 'حدّد هذا الخيار إذا لم يُحدَّد تاريخ التسجيل بعد.',
     'panel.preview.tbd': 'لن يظهر في البودكاست القادم حتى يُحدَّد التاريخ.',
     'panel.preview.past': 'مضى (في الأرشيف)', 'panel.preview.shown': 'يظهر في البودكاست القادم',
     'panel.needDate': 'يرجى اختيار تاريخ أو تحديد «غير محدد»',
@@ -360,8 +361,9 @@ export function LangProvider({ children }) {
       if (n === -1) return t('rel.yesterday');
       return n > 1 ? t('rel.inDays', { n }) : t('rel.daysAgo', { n: Math.abs(n) });
     };
+    const masa = (m) => formatMasa(m, lang);
     const serverError = (msg) => (lang === 'ar' && SERVER_ERR_AR[msg]) || msg;
-    return { lang, setLang, dir: lang === 'ar' ? 'rtl' : 'ltr', t, fmt: { hari, date, monthShort, tarikhHari, relative, arDays }, serverError };
+    return { lang, setLang, dir: lang === 'ar' ? 'rtl' : 'ltr', t, fmt: { hari, date, monthShort, tarikhHari, relative, arDays, masa }, serverError };
   }, [lang, setLang]);
 
   return <LangCtx.Provider value={value}>{children}</LangCtx.Provider>;

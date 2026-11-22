@@ -1,5 +1,6 @@
 import { CONFIG } from '../config.js';
 import { formatTarikh, hariOf } from './utils.js';
+import { formatMasa } from './schedule.js';
 
 export const hubUrl = () => CONFIG.HUB_URL || `${window.location.origin}${window.location.pathname}`;
 
@@ -12,7 +13,7 @@ export function buildWaMessage(item) {
     `📌 *Tajuk:* ${item.tajuk}`,
     `📅 *Hari/Tarikh:* ${hariOf(item) ? `${hariOf(item)}, ` : ''}${formatTarikh(item.tarikh)}`,
   ];
-  if (item.masa) lines.push(`⏰ *Masa:* ${item.masa}`);
+  if (item.masa) lines.push(`⏰ *Masa:* ${formatMasa(item.masa, 'ms')}`); // WA message stays BM for the group
   if (item.panel) lines.push(`👥 *Panel:* ${item.panel}`);
   lines.push(
     '',
