@@ -13,7 +13,7 @@ const fields = (t) => [
 ];
 
 function Badge({ n }) {
-  const { t, tr } = useI18n();
+  const { t } = useI18n();
   return (
     <span
       className={cx('grid h-11 min-w-[3.25rem] shrink-0 place-items-center rounded-full px-2.5 text-base font-extrabold tabular-nums', n === 0 ? 'bg-ink/5 text-muted' : 'bg-accent text-on-accent')}
@@ -25,9 +25,11 @@ function Badge({ n }) {
   );
 }
 
+// Promosi Kitab shows book names and script titles exactly as entered, in both languages
+// (the *_ar translations are deliberately not used here). Static UI text is still translated.
 export default function Kitab() {
   const { db, isAdmin, create, update, remove, increment } = useData();
-  const { t, tr } = useI18n();
+  const { t } = useI18n();
   const book = useEditor();
   const script = useEditor();
   const [asc, setAsc] = useState(true);
@@ -74,7 +76,7 @@ export default function Kitab() {
                   <li key={r.id} className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3.5 sm:flex-nowrap sm:px-5">
                     <BookMarked size={20} className="shrink-0 self-start text-primary sm:self-center" strokeWidth={1.8} />
                     <div className="min-w-0 flex-1">
-                      <p dir="auto" className="font-semibold leading-snug text-ink wrap-anywhere">{tr(r, 'nama_kitab')}</p>
+                      <p dir="auto" className="font-semibold leading-snug text-ink wrap-anywhere">{r.nama_kitab}</p>
                       <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-line" aria-hidden>
                         <div className="h-full rounded-full bg-accent transition-all" style={{ width: `${(n / max) * 100}%` }} />
                       </div>
@@ -83,11 +85,11 @@ export default function Kitab() {
                     {isAdmin && (
                       <div className="-ms-2 flex w-full items-center justify-end gap-2 sm:ms-0 sm:w-auto">
                         <RowActions className="me-auto sm:order-last sm:me-0" onEdit={() => book.setEditing(r)} onDelete={() => book.setDeleting(r)} />
-                        <button className="btn-icon border border-line" onClick={() => increment('KITAB', r.id, -1)} disabled={n <= 0} aria-label={t('kb.dec', { name: tr(r, 'nama_kitab') })}>
+                        <button className="btn-icon border border-line" onClick={() => increment('KITAB', r.id, -1)} disabled={n <= 0} aria-label={t('kb.dec', { name: r.nama_kitab })}>
                           <Minus size={15} />
                         </button>
                         <Badge n={n} />
-                        <button className="btn-icon border border-line" onClick={() => increment('KITAB', r.id, 1)} aria-label={t('kb.inc', { name: tr(r, 'nama_kitab') })}>
+                        <button className="btn-icon border border-line" onClick={() => increment('KITAB', r.id, 1)} aria-label={t('kb.inc', { name: r.nama_kitab })}>
                           <Plus size={15} />
                         </button>
                       </div>
@@ -108,14 +110,14 @@ export default function Kitab() {
             <Empty title={t('kb.noScript')} hint={t('kb.noScriptHint')} />
           ) : (
             scripts.map((s) => (
-              <DriveCard key={s.id} item={s} featured isAdmin={isAdmin} onEdit={() => script.setEditing(s)} onDelete={() => script.setDeleting(s)} />
+              <DriveCard key={s.id} item={s} featured original isAdmin={isAdmin} onEdit={() => script.setEditing(s)} onDelete={() => script.setDeleting(s)} />
             ))
           )}
         </aside>
       </div>
 
       <FormModal open={Boolean(book.editing)} onClose={() => book.setEditing(null)} title={book.editing?.id ? t('kb.edit') : t('kb.add')} fields={fields(t)} initial={book.editing} onSubmit={saveBook} />
-      <ConfirmModal open={Boolean(book.deleting)} onClose={() => book.setDeleting(null)} onConfirm={() => remove('KITAB', book.deleting.id)} message={t('ui.deleteNamed', { name: tr(book.deleting, 'nama_kitab') })} />
+      <ConfirmModal open={Boolean(book.deleting)} onClose={() => book.setDeleting(null)} onConfirm={() => remove('KITAB', book.deleting.id)} message={t('ui.deleteNamed', { name: book.deleting?.nama_kitab })} />
       <FormModal open={Boolean(script.editing)} onClose={() => script.setEditing(null)} title={script.editing?.id ? t('kb.editScript') : t('kb.addScriptTitle')} fields={driveFields(t)} initial={script.editing} onSubmit={saveScript} />
       <ConfirmModal open={Boolean(script.deleting)} onClose={() => script.setDeleting(null)} onConfirm={() => remove('PANDUAN', script.deleting.id)} />
     </section>

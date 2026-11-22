@@ -13,9 +13,11 @@ export function driveDownload(url) {
   return id ? `https://drive.google.com/uc?export=download&id=${id}` : url;
 }
 
-export function DriveCard({ item, isAdmin, onEdit, onDelete, onUp, onDown, featured = false }) {
+/** `original`: always show the text exactly as entered (no *_ar translation) — used by Promosi Kitab. */
+export function DriveCard({ item, isAdmin, onEdit, onDelete, onUp, onDown, featured = false, original = false }) {
   const hasUrl = Boolean(item.gdrive_url);
-  const { t, tr } = useI18n();
+  const { t, tr: translate } = useI18n();
+  const tr = original ? (row, f) => row?.[f] || '' : translate;
   return (
     <article
       className={cx(
