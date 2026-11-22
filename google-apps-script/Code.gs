@@ -292,7 +292,7 @@ function applyTranslationPatch_(name, row, patch, isAdmin) {
     if (srcChanged) patch[k] = toArabic_(patch[f]);
     else if (!isAdmin) delete patch[k];
     else if (patch[k] !== undefined && String(patch[k]) === String(row[k] || '')) delete patch[k];
-    else if (patch[k] === undefined && !String(row[k] || '').trim() && String(row[f] || '').trim()) patch[k] = toArabic_(row[f]);
+    else if (patch[k] === undefined && needsArabic_(row[f], row[k])) patch[k] = toArabic_(row[f]);
   });
 }
 
@@ -312,10 +312,37 @@ function toArabic_(text) {
   if (arabic > latin) return s;        // already (mostly) Arabic
   try {
     var out = String(LanguageApp.translate(s, TRANSLATE_FROM, 'ar') || '').trim();
-    return out;
+    // LanguageApp sometimes hands the Malay text back untranslated: treat as a failure so it is retried.
+    return /[\u0600-\u06FF]/.test(out) ? out : '';
   } catch (e) {
     return '';
   }
+}
+
+/** True when `src` has Malay text but its `_ar` cell is blank or holds no Arabic (e.g. a copied/untranslated value). */
+function needsArabic_(src, ar) {
+  var s = String(src == null ? '' : src).trim();
+  if (!s || /^https?:\/\//i.test(s) || !/[A-Za-z]/.test(s)) return false;
+  return !/[\u0600-\u06FF]/.test(String(ar == null ? '' : ar));
+}
+
+/**
+ * Simple trigger: when an admin types a source cell (e.g. balasan_admin) straight into the Sheet,
+ * refresh its _ar cell so the Arabic view never shows a stale or missing translation.
+ */
+function onEdit(e) {
+  try {
+    if (!e || !e.range) return;
+    var sh = e.range.getSheet();
+    var name = sh.getName();
+    if (!TRANSLATE[name] || e.range.getNumRows() !== 1 || e.range.getNumColumns() !== 1 || e.range.getRow() < 2) return;
+    var header = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(function (h) { return String(h).trim(); });
+    var f = header[e.range.getColumn() - 1];
+    if (TRANSLATE[name].indexOf(f) < 0) return;
+    var dst = header.indexOf(f + '_ar');
+    if (dst < 0) return;
+    sh.getRange(e.range.getRow(), dst + 1).setValue(cell_(f + '_ar', toArabic_(e.range.getValue())));
+  } catch (err) { /* translateAllExistingRows() will catch up */ }
 }
 
 /**
@@ -333,7 +360,7 @@ function translateAllExistingRows() {
       var dst = data.header.indexOf(f + '_ar');
       if (dst < 0) return;
       data.rows.forEach(function (r) {
-        if (!String(r[f] || '').trim() || String(r[f + '_ar'] || '').trim()) return;
+        if (!needsArabic_(r[f], r[f + '_ar'])) return; // also retries untranslated (non-Arabic) _ar cells, e.g. balasan_admin_ar
         if (Date.now() - started > LIMIT_MS) { remaining++; return; }
         var ar = toArabic_(r[f]);
         if (ar) { data.sh.getRange(r._row, dst + 1).setValue(cell_(f + '_ar', ar)); done++; }

@@ -831,6 +831,15 @@ async function scheduleSyncFlow(page, tag, { checkHero = false } = {}) {
       txt = await textOf('cadangan');
       expectAll(txt, S('CADANGAN'), ['catatan'], 'Cadangan catatan');
       expectAll(txt, S('CADANGAN'), ['balasan_admin'], 'Cadangan reply');
+      {
+        const r = S('CADANGAN').find((x) => x.balasan_admin === 'Baik, akan dilaksanakan bulan depan.');
+        assert.ok(r && r.balasan_admin_ar, 'admin reply saved with balasan_admin_ar');
+        const card = p.locator('li', { hasText: r.catatan_ar || r.catatan });
+        const box = await card.innerText();
+        assert.ok(box.includes(r.catatan_ar) && box.includes(r.balasan_admin_ar), 'suggestion + admin reply both in Arabic');
+        assert.equal((await card.locator('p').last().innerText()).trim(), r.balasan_admin_ar, 'reply box renders balasan_admin_ar, not the Malay');
+        await card.screenshot({ path: process.env.CADANGAN_AR_SHOT || '/dev/null' }).catch(() => {});
+      }
 
       // Salin Info WA follows the UI language
       await adminLogin(p);

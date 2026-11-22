@@ -284,6 +284,20 @@ const test = async (name, fn) => { await fn(); passed++; console.log('  ✓', na
       assert.equal(u.nama_kitab_ar, AR('Al-Hikam Syarah'));
     });
 
+    await test('CADANGAN admin reply: saved reply gets balasan_admin_ar; backfill fixes missing/untranslated replies', async () => {
+      const c = ok(await post({ action: 'create', sheet: 'CADANGAN', item: { catatan: 'Suara panel kurang jelas' } }));
+      const u = ok(await post({ action: 'update', sheet: 'CADANGAN', id: c.id, pin: PIN, patch: { balasan_admin: 'Baik kami ambil maklum', status: 'SELESAI' } }));
+      assert.equal(u.balasan_admin_ar, AR('Baik kami ambil maklum'));
+      assert.equal(cell('CADANGAN', c.id, 'balasan_admin_ar'), AR('Baik kami ambil maklum'));
+      // reply typed into the Sheet / copied Malay in _ar -> translateAllExistingRows() repairs it
+      const sh = rt.sheets.get('CADANGAN'); const h = sh.data[0];
+      const row = sh.data.find((r) => r[0] === c.id);
+      row[h.indexOf('balasan_admin')] = 'Terima kasih banyak';
+      row[h.indexOf('balasan_admin_ar')] = 'Terima kasih banyak';
+      rt.gs.translateAllExistingRows();
+      assert.equal(cell('CADANGAN', c.id, 'balasan_admin_ar'), AR('Terima kasih banyak'));
+    });
+
     await test('translateAllExistingRows(): fills only missing _ar cells, retries failures, idempotent', async () => {
       const sh = rt.sheets.get('PANEL');
       const iT = sh.data[0].indexOf('tajuk_ar');
