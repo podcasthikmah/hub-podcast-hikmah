@@ -11,10 +11,10 @@ import { Empty, SectionHeader } from '../components/ui.jsx';
 function CopyWa({ item }) {
   const [done, setDone] = useState(false);
   const { toast, isAdmin } = useData();
-  const { t } = useI18n();
+  const { t, lang, fmt, tr } = useI18n();
   if (!isAdmin) return null;
   const onCopy = async () => {
-    const ok = await copyText(buildWaMessage(item));
+    const ok = await copyText(buildWaMessage(item, { lang, fmt, tr })); // message follows the UI language
     if (ok) {
       setDone(true);
       toast(t('wa.toast'));
@@ -30,7 +30,7 @@ function CopyWa({ item }) {
 
 /** Jumps to List Panel, where the schedule is managed. */
 function ManageLink({ className = '' }) {
-  const { t } = useI18n();
+  const { t, tr } = useI18n();
   return (
     <a
       href="#panel"
@@ -48,7 +48,7 @@ function ManageLink({ className = '' }) {
  */
 export default function Upcoming() {
   const { db, isAdmin } = useData();
-  const { t, fmt, lang } = useI18n();
+  const { t, fmt, lang, tr } = useI18n();
   const rows = useMemo(() => deriveSchedule(db.PANEL), [db.PANEL]);
 
   return (
@@ -95,10 +95,10 @@ export default function Upcoming() {
                         </span>
                       )}
                     </div>
-                    <h3 dir="auto" className="text-[17px] font-bold leading-snug text-ink wrap-anywhere sm:text-base">{r.tajuk}</h3>
+                    <h3 dir="auto" className="text-[17px] font-bold leading-snug text-ink wrap-anywhere sm:text-base">{tr(r, 'tajuk')}</h3>
                     <p className="mt-1.5 flex items-start gap-1.5 text-[15px] leading-snug text-muted wrap-anywhere sm:text-sm">
                       <Users size={15} className="mt-0.5 shrink-0" />
-                      <span dir="auto" data-testid="slot-panel">{r.panel}</span>
+                      <span dir="auto" data-testid="slot-panel">{tr(r, 'panel')}</span>
                     </p>
                   </div>
                 </div>

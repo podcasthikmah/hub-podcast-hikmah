@@ -24,6 +24,24 @@ var HEADERS = {
   YOUTUBE:    ['id', 'order', 'tajuk', 'youtube_url', 'custom_thumbnail', 'tarikh'],
   CADANGAN:   ['id', 'tarikh', 'catatan', 'status', 'balasan_admin', 'created_at', 'owner_hash']
 };
+// ---- Auto-translation BM -> Arabic ------------------------------------------
+// Source fields per tab; each gets a "<field>_ar" column (added to HEADERS below and to the
+// live Sheet automatically by the self-healing headers). Filled on create/update and by
+// translateAllExistingRows(). Admins may correct an _ar cell in the Sheet: it is kept until the
+// Malay source text changes.
+var TRANSLATE_FROM = 'ms';
+var TRANSLATE = {
+  PANEL:      ['tajuk', 'nama_panel'],
+  PANDUAN:    ['tajuk', 'keterangan'],
+  PERINGATAN: ['petikan', 'konteks'],      // 'arab' is already Arabic
+  KITAB:      ['nama_kitab'],
+  YOUTUBE:    ['tajuk'],
+  CADANGAN:   ['catatan', 'balasan_admin']
+};
+Object.keys(TRANSLATE).forEach(function (name) {
+  TRANSLATE[name].forEach(function (f) { HEADERS[name].push(f + '_ar'); });
+});
+
 var HIDDEN_COLS = { owner_hash: true };       // never sent to the browser
 var NUMERIC_COLS = { order: true, bilangan: true };
 var PUBLIC_EDIT_FIELDS = ['tarikh', 'catatan']; // what a public owner may change in CADANGAN
@@ -219,6 +237,7 @@ function createRow_(name, item, isAdmin, ownerKey) {
   }
   if (name === 'KITAB') obj.bilangan = Math.max(0, Number(obj.bilangan) || 0);
   obj.id = Utilities.getUuid().slice(0, 12);
+  (TRANSLATE[name] || []).forEach(function (f) { obj[f + '_ar'] = toArabic_(obj[f]); });
 
   var rowValues = data.header.map(function (h) { return cell_(h, obj[h]); });
   data.sh.appendRow(rowValues);
@@ -249,6 +268,7 @@ function updateRow_(name, id, patch, isAdmin, ownerKey) {
   delete patch.created_at;
   if (name === 'CADANGAN' && patch.status !== undefined) patch.status = patch.status === 'SELESAI' ? 'SELESAI' : 'BELUM';
   if (patch.tarikh !== undefined && patch.tarikh !== '') patch.tarikh = isoDate_(patch.tarikh) || patch.tarikh;
+  applyTranslationPatch_(name, row, patch, isAdmin);
 
   data.header.forEach(function (h, c) {
     if (patch[h] === undefined || HEADERS[name].indexOf(h) < 0) return;
@@ -256,6 +276,75 @@ function updateRow_(name, id, patch, isAdmin, ownerKey) {
     row[h] = NUMERIC_COLS[h] ? Number(patch[h]) || 0 : String(patch[h]);
   });
   return publicRow_(row);
+}
+
+/**
+ * Decides the *_ar values for an update:
+ *  - Malay source changed       -> fresh translation (ignores any stale _ar the client sent)
+ *  - public user                -> can never write _ar directly
+ *  - admin sent a different _ar -> manual correction, kept
+ *  - _ar missing on this row    -> filled now
+ */
+function applyTranslationPatch_(name, row, patch, isAdmin) {
+  (TRANSLATE[name] || []).forEach(function (f) {
+    var k = f + '_ar';
+    var srcChanged = patch[f] !== undefined && String(patch[f]).trim() !== String(row[f] || '').trim();
+    if (srcChanged) patch[k] = toArabic_(patch[f]);
+    else if (!isAdmin) delete patch[k];
+    else if (patch[k] !== undefined && String(patch[k]) === String(row[k] || '')) delete patch[k];
+    else if (patch[k] === undefined && !String(row[k] || '').trim() && String(row[f] || '').trim()) patch[k] = toArabic_(row[f]);
+  });
+}
+
+/**
+ * Malay -> Arabic via LanguageApp. Returns:
+ *  - the text itself if it is already Arabic, a URL, or only numbers/symbols
+ *  - '' if empty or if translation fails (the app then shows the Malay original, and
+ *    translateAllExistingRows() can retry later — a copied Malay value would never be retried)
+ */
+function toArabic_(text) {
+  var s = String(text == null ? '' : text).trim();
+  if (!s) return '';
+  if (/^https?:\/\//i.test(s)) return s;
+  var latin = (s.match(/[A-Za-z]/g) || []).length;
+  var arabic = (s.match(/[\u0600-\u06FF]/g) || []).length;
+  if (!latin) return s;                // numbers / symbols / Arabic only
+  if (arabic > latin) return s;        // already (mostly) Arabic
+  try {
+    var out = String(LanguageApp.translate(s, TRANSLATE_FROM, 'ar') || '').trim();
+    return out;
+  } catch (e) {
+    return '';
+  }
+}
+
+/**
+ * ONE-CLICK HELPER — run from the Apps Script editor after deploying this version.
+ * Fills every missing *_ar cell in all tabs (adds the _ar columns first if needed).
+ * Stops safely before the 6-minute execution limit: just run it again to continue.
+ */
+function translateAllExistingRows() {
+  var started = Date.now();
+  var LIMIT_MS = 5 * 60 * 1000;
+  var done = 0, failed = 0, remaining = 0;
+  Object.keys(TRANSLATE).forEach(function (name) {
+    var data = readSheet_(name); // also appends any missing _ar columns
+    TRANSLATE[name].forEach(function (f) {
+      var dst = data.header.indexOf(f + '_ar');
+      if (dst < 0) return;
+      data.rows.forEach(function (r) {
+        if (!String(r[f] || '').trim() || String(r[f + '_ar'] || '').trim()) return;
+        if (Date.now() - started > LIMIT_MS) { remaining++; return; }
+        var ar = toArabic_(r[f]);
+        if (ar) { data.sh.getRange(r._row, dst + 1).setValue(cell_(f + '_ar', ar)); done++; }
+        else failed++;
+      });
+    });
+  });
+  SpreadsheetApp.flush();
+  var msg = 'Diterjemah: ' + done + ' | Gagal: ' + failed + ' | Belum (jalankan semula): ' + remaining;
+  Logger.log(msg);
+  return { translated: done, failed: failed, remaining: remaining };
 }
 
 function deleteRow_(name, id) {

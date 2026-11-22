@@ -17,7 +17,7 @@ const editFields = (t) => [
 
 function NewForm() {
   const { create, toast } = useData();
-  const { t } = useI18n();
+  const { t, tr } = useI18n();
   const [tarikh, setTarikh] = useState(todayISO);
   const [catatan, setCatatan] = useState('');
   const [hp, setHp] = useState(''); // honeypot
@@ -68,7 +68,7 @@ function NewForm() {
 
 function AdminReply({ item }) {
   const { update } = useData();
-  const { t } = useI18n();
+  const { t, tr } = useI18n();
   const [val, setVal] = useState(item.balasan_admin || '');
   useEffect(() => setVal(item.balasan_admin || ''), [item.balasan_admin]);
   const dirty = val !== (item.balasan_admin || '');
@@ -93,7 +93,7 @@ function AdminReply({ item }) {
 
 function Bubble({ item, onEdit, onDelete }) {
   const { isAdmin, isMine, update } = useData();
-  const { t, fmt } = useI18n();
+  const { t, fmt, tr } = useI18n();
   const done = item.status === STATUS.SELESAI;
   const mine = isMine(item.id);
   const canEdit = isAdmin || (mine && !done);
@@ -111,7 +111,7 @@ function Bubble({ item, onEdit, onDelete }) {
             {isAdmin && <button className="btn-icon hover:!text-danger" onClick={onDelete} aria-label={t('cd.delete')}><Trash2 size={15} /></button>}
           </div>
         </div>
-        <p dir="auto" className={cx('whitespace-pre-line text-base leading-relaxed text-ink wrap-anywhere sm:text-[15px]', done && 'text-ink/70')}>{item.catatan}</p>
+        <p dir="auto" className={cx('whitespace-pre-line text-base leading-relaxed text-ink wrap-anywhere sm:text-[15px]', done && 'text-ink/70')}>{tr(item, 'catatan')}</p>
       </div>
 
       {/* Admin part */}
@@ -137,7 +137,7 @@ function Bubble({ item, onEdit, onDelete }) {
         {isAdmin ? (
           <AdminReply item={item} />
         ) : item.balasan_admin ? (
-          <p dir="auto" className="whitespace-pre-line text-[15px] leading-relaxed text-ink wrap-anywhere sm:text-sm">{item.balasan_admin}</p>
+          <p dir="auto" className="whitespace-pre-line text-[15px] leading-relaxed text-ink wrap-anywhere sm:text-sm">{tr(item, 'balasan_admin')}</p>
         ) : (
           <p className="text-[15px] italic text-muted sm:text-sm">{t('cd.waiting')}</p>
         )}
@@ -148,7 +148,7 @@ function Bubble({ item, onEdit, onDelete }) {
 
 export default function Cadangan() {
   const { db, update, remove, isAdmin } = useData();
-  const { t } = useI18n();
+  const { t, tr } = useI18n();
   const { editing, setEditing, deleting, setDeleting } = useEditor();
   const [filter, setFilter] = useState('semua');
 

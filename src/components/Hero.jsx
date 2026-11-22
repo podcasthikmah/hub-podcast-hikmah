@@ -8,7 +8,7 @@ import { StarPattern } from './Pattern.jsx';
 
 /** Slim, tappable "next podcast" strip used on phones for non-Upcoming tabs. */
 function HeroStrip({ next, n, goTo }) {
-  const { t } = useI18n();
+  const { t, tr } = useI18n();
   if (!next) return null;
   return (
     <a
@@ -19,7 +19,7 @@ function HeroStrip({ next, n, goTo }) {
       <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-accent/40 text-accent"><Mic2 size={16} /></span>
       <span className="min-w-0 flex-1">
         <span className="block text-xs font-bold uppercase tracking-[0.12em] text-accent">{t('hero.nextShort')}</span>
-        <span dir="auto" className="block truncate text-sm font-semibold">{next.tajuk}</span>
+        <span dir="auto" className="block truncate text-sm font-semibold">{tr(next, 'tajuk')}</span>
       </span>
       <span className="shrink-0 rounded-full bg-accent px-2.5 py-1 text-xs font-bold text-on-accent">{n === 0 ? t('hero.today') : n === 1 ? t('hero.tomorrow') : t('hero.daysChip', { n })}</span>
       <ChevronRight size={18} className="flip-rtl -me-1 shrink-0 text-on-brand/60" />
@@ -29,7 +29,7 @@ function HeroStrip({ next, n, goTo }) {
 
 export function Hero({ goTo, compact = false }) {
   const { db, hasData } = useData();
-  const { t, fmt } = useI18n();
+  const { t, fmt, tr } = useI18n();
   // Nearest dated LIST PANEL entry (today or later) — same source as Upcoming Podcast.
   const next = nextScheduled(db.PANEL);
   const n = next ? daysUntil(next.tarikh) : null;
@@ -56,14 +56,14 @@ export function Hero({ goTo, compact = false }) {
             </div>
           ) : next ? (
             <>
-              <h1 dir="auto" className="text-[26px] font-extrabold leading-[1.15] tracking-tight wrap-anywhere sm:text-[2rem]">{next.tajuk}</h1>
+              <h1 dir="auto" className="text-[26px] font-extrabold leading-[1.15] tracking-tight wrap-anywhere sm:text-[2rem]">{tr(next, 'tajuk')}</h1>
               <div className="mt-4 flex flex-col gap-2 text-[15px] text-on-brand/85 sm:flex-row sm:flex-wrap sm:gap-x-5 sm:text-sm">
                 <span className="inline-flex items-start gap-2">
                   <CalendarClock size={17} className="mt-0.5 shrink-0 text-accent" />
                   <span data-testid="hero-when">{fmt.tarikhHari(next.tarikh)}{next.masa ? ` · ${fmt.masa(next.masa)}` : ''}</span>
                 </span>
                 {next.panel && (
-                  <span className="inline-flex items-start gap-2 wrap-anywhere"><Users size={17} className="mt-0.5 shrink-0 text-accent" /><span dir="auto">{next.panel}</span></span>
+                  <span className="inline-flex items-start gap-2 wrap-anywhere"><Users size={17} className="mt-0.5 shrink-0 text-accent" /><span dir="auto">{tr(next, 'panel')}</span></span>
                 )}
               </div>
             </>

@@ -7,6 +7,7 @@ import { StarPattern } from '../components/Pattern.jsx';
 import { AddButton, ConfirmModal, Empty, FormModal, RowActions, SectionHeader, moved, useEditor } from '../components/ui.jsx';
 
 function Thumb({ item, className = '' }) {
+  const { tr } = useI18n();
   const id = getYouTubeId(item.youtube_url);
   const custom = isUrl(item.custom_thumbnail) ? item.custom_thumbnail : '';
   // Demo seed IDs (CONTOH…) don't exist on YouTube: skip the request instead of logging 404s.
@@ -30,7 +31,7 @@ function Thumb({ item, className = '' }) {
       ) : (
         <div className="absolute inset-0 grid place-items-center text-accent">
           <StarPattern id={`yt-${item.id}`} opacity={0.08} />
-          <span dir="auto" className="relative line-clamp-3 px-6 text-center text-sm font-semibold text-on-brand/85 wrap-anywhere">{item.tajuk}</span>
+          <span dir="auto" className="relative line-clamp-3 px-6 text-center text-sm font-semibold text-on-brand/85 wrap-anywhere">{tr(item, 'tajuk')}</span>
         </div>
       )}
       <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-transparent" />
@@ -66,7 +67,7 @@ const fields = (t) => [
 
 export default function Youtube() {
   const { db, isAdmin, create, update, remove, reorder, toast } = useData();
-  const { t, fmt } = useI18n();
+  const { t, fmt, tr } = useI18n();
   const { editing, setEditing, deleting, setDeleting } = useEditor();
   const rows = useMemo(() => [...db.YOUTUBE].sort(byOrder), [db.YOUTUBE]);
 
@@ -98,7 +99,7 @@ export default function Youtube() {
                 <a href={id ? ytWatch(id) : r.youtube_url} target="_blank" rel="noopener noreferrer" className="flex flex-1 flex-col focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent">
                   <Thumb item={r} />
                   <div className="flex flex-1 flex-col gap-1 p-4">
-                    <h3 dir="auto" className="line-clamp-2 text-[17px] font-bold leading-snug text-ink wrap-anywhere group-hover:text-primary sm:text-base">{r.tajuk}</h3>
+                    <h3 dir="auto" className="line-clamp-2 text-[17px] font-bold leading-snug text-ink wrap-anywhere group-hover:text-primary sm:text-base">{tr(r, 'tajuk')}</h3>
                     {r.tarikh && <p className="text-[13px] text-muted">{fmt.date(r.tarikh)}</p>}
                   </div>
                 </a>
@@ -118,7 +119,7 @@ export default function Youtube() {
       )}
 
       <FormModal open={Boolean(editing)} onClose={() => setEditing(null)} title={editing?.id ? t('yt.edit') : t('yt.add')} fields={fields(t)} initial={editing} onSubmit={save} />
-      <ConfirmModal open={Boolean(deleting)} onClose={() => setDeleting(null)} onConfirm={() => remove('YOUTUBE', deleting.id)} message={t('ui.deleteNamed', { name: deleting?.tajuk })} />
+      <ConfirmModal open={Boolean(deleting)} onClose={() => setDeleting(null)} onConfirm={() => remove('YOUTUBE', deleting.id)} message={t('ui.deleteNamed', { name: tr(deleting, 'tajuk') })} />
     </section>
   );
 }
