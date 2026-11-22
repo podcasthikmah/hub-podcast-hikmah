@@ -8,7 +8,7 @@ import { AddButton, ConfirmModal, Empty, FormModal, RowActions, SectionHeader, u
 
 /** Live preview under the date field: the derived Bahasa Melayu day + full date. */
 function HariPreview({ values }) {
-  const { t, fmt } = useI18n();
+  const { t, fmt, tr } = useI18n();
   if (values.tbd) {
     return <p className="mt-2 text-[13px] font-medium text-muted">{t('panel.preview.tbd')}</p>;
   }
@@ -52,7 +52,7 @@ function rank(r) {
 }
 
 function DateLine({ tarikh, masa }) {
-  const { t, fmt } = useI18n();
+  const { t, fmt, tr } = useI18n();
   if (!isDated(tarikh)) {
     return (
       <span className="chip mt-1.5 border border-dashed border-muted/50 bg-transparent text-muted">
@@ -74,7 +74,7 @@ function DateLine({ tarikh, masa }) {
 
 export default function PanelList() {
   const { db, isAdmin, create, update, remove, toast } = useData();
-  const { t } = useI18n();
+  const { t, tr } = useI18n();
   const { editing, setEditing, deleting, setDeleting } = useEditor();
   const [q, setQ] = useState('');
   const [when, setWhen] = useState('semua');
@@ -82,7 +82,7 @@ export default function PanelList() {
   const rows = useMemo(() => {
     const term = norm(q).trim();
     return [...db.PANEL]
-      .filter((r) => !term || norm(`${r.tajuk} ${r.nama_panel}`).includes(term))
+      .filter((r) => !term || norm(`${tr(r, 'tajuk')} ${tr(r, 'nama_panel')} ${r.tajuk_ar || ''} ${r.nama_panel_ar || ''}`).includes(term))
       .filter((r) => {
         if (when === 'semua') return true;
         const k = rank(r);
@@ -160,8 +160,8 @@ export default function PanelList() {
             <li key={r.id} data-panel-id={r.id} className={cx('flex min-h-[72px] items-center gap-3 px-4 py-3 sm:gap-3.5 sm:px-5', rank(r) === 2 && 'opacity-80')}>
               <span className="grid h-10 w-10 shrink-0 place-items-center self-start rounded-full bg-brand/10 text-primary dark:bg-accent/15 sm:self-center"><UserRound size={18} /></span>
               <div className="min-w-0 flex-1">
-                <p dir="auto" className="line-clamp-2 font-semibold leading-snug text-ink wrap-anywhere">{r.nama_panel}</p>
-                <p dir="auto" className="mt-0.5 line-clamp-2 text-sm leading-snug text-muted wrap-anywhere">{r.tajuk}</p>
+                <p dir="auto" className="line-clamp-2 font-semibold leading-snug text-ink wrap-anywhere">{tr(r, 'nama_panel')}</p>
+                <p dir="auto" className="mt-0.5 line-clamp-2 text-sm leading-snug text-muted wrap-anywhere">{tr(r, 'tajuk')}</p>
                 <DateLine tarikh={r.tarikh} masa={r.masa} />
               </div>
               {isAdmin && <RowActions onEdit={() => openEditor(r)} onDelete={() => setDeleting(r)} />}
@@ -175,7 +175,7 @@ export default function PanelList() {
         open={Boolean(deleting)}
         onClose={() => setDeleting(null)}
         onConfirm={() => remove('PANEL', deleting.id)}
-        message={`${t('panel.confirmDelete', { name: deleting?.nama_panel })}${isDated(deleting?.tarikh) ? t('panel.confirmDeleteUp') : ''}`}
+        message={`${t('panel.confirmDelete', { name: tr(deleting, 'nama_panel') })}${isDated(deleting?.tarikh) ? t('panel.confirmDeleteUp') : ''}`}
       />
     </section>
   );

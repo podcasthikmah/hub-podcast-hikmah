@@ -55,6 +55,13 @@ export function joinNames(names) {
   return `${n.slice(0, -1).join(', ')} & ${n[n.length - 1]}`;
 }
 
+/** Arabic list: ['أ','ب','ج'] -> 'أ، ب و ج' */
+export function joinNamesAr(names) {
+  const n = names.filter(Boolean);
+  if (n.length <= 1) return n[0] || '';
+  return `${n.slice(0, -1).join('، ')} و${n[n.length - 1]}`;
+}
+
 const key = (s) => String(s || '').trim().toLowerCase().replace(/\s+/g, ' ');
 
 /**
@@ -70,17 +77,21 @@ export function deriveSchedule(panelRows = [], { includePast = false } = {}) {
     const n = daysUntil(tarikh);
     if (!includePast && (n === null || n < 0)) continue;
     const k = `${tarikh}|${key(r.tajuk)}`;
-    if (!slots.has(k)) slots.set(k, { id: k, tarikh, hari: hariFromISO(tarikh), tajuk: String(r.tajuk || '').trim(), masa: '', names: [], ids: [] });
+    if (!slots.has(k)) slots.set(k, { id: k, tarikh, hari: hariFromISO(tarikh), tajuk: String(r.tajuk || '').trim(), tajuk_ar: '', masa: '', names: [], names_ar: [], ids: [] });
     const s = slots.get(k);
     // shooting time: the earliest valid time among the slot's panelists
     const m = normalizeMasa(r.masa);
     if (m && (!s.masa || m < s.masa)) s.masa = m;
+    if (!s.tajuk_ar) s.tajuk_ar = String(r.tajuk_ar || '').trim();
     const name = String(r.nama_panel || '').trim();
-    if (name && !s.names.some((x) => key(x) === key(name))) s.names.push(name);
+    if (name && !s.names.some((x) => key(x) === key(name))) {
+      s.names.push(name);
+      s.names_ar.push(String(r.nama_panel_ar || '').trim() || name); // untranslated name -> keep original
+    }
     s.ids.push(r.id);
   }
   return [...slots.values()]
-    .map((s) => ({ ...s, panel: joinNames(s.names) }))
+    .map((s) => ({ ...s, panel: joinNames(s.names), panel_ar: s.names_ar.some((x, i) => x !== s.names[i]) ? joinNamesAr(s.names_ar) : '' }))
     // nearest date first; same day -> earlier time first (no time last)
     .sort((a, b) => a.tarikh.localeCompare(b.tarikh) || (a.masa || '99:99').localeCompare(b.masa || '99:99') || a.tajuk.localeCompare(b.tajuk));
 }

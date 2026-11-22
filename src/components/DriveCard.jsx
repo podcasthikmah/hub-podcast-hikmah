@@ -15,7 +15,7 @@ export function driveDownload(url) {
 
 export function DriveCard({ item, isAdmin, onEdit, onDelete, onUp, onDown, featured = false }) {
   const hasUrl = Boolean(item.gdrive_url);
-  const { t } = useI18n();
+  const { t, tr } = useI18n();
   return (
     <article
       className={cx(
@@ -29,10 +29,10 @@ export function DriveCard({ item, isAdmin, onEdit, onDelete, onUp, onDown, featu
         </span>
         <div className="min-w-0 flex-1">
           <p className={cx('mb-0.5 text-xs font-bold uppercase tracking-[0.14em]', featured ? 'text-accent' : 'text-muted')}><span lang="en" dir="ltr">PDF · Google Drive</span></p>
-          <h3 dir="auto" className="text-[17px] font-bold leading-snug wrap-anywhere sm:text-base">{item.tajuk}</h3>
+          <h3 dir="auto" className="text-[17px] font-bold leading-snug wrap-anywhere sm:text-base">{tr(item, 'tajuk')}</h3>
         </div>
       </div>
-      {item.keterangan && <p dir="auto" className={cx('text-[15px] leading-relaxed wrap-anywhere sm:text-sm', featured ? 'text-on-brand/80' : 'text-muted')}>{item.keterangan}</p>}
+      {item.keterangan && <p dir="auto" className={cx('text-[15px] leading-relaxed wrap-anywhere sm:text-sm', featured ? 'text-on-brand/80' : 'text-muted')}>{tr(item, 'keterangan')}</p>}
       <div className="mt-auto flex gap-2">
         {hasUrl ? (
           <>
@@ -44,7 +44,7 @@ export function DriveCard({ item, isAdmin, onEdit, onDelete, onUp, onDown, featu
               href={item.gdrive_url}
               target="_blank"
               rel="noopener noreferrer"
-              aria-label={t('drive.viewAria', { title: item.tajuk })}
+              aria-label={t('drive.viewAria', { title: tr(item, 'tajuk') })}
             >
               <ExternalLink size={16} className="flip-rtl" /> <span className="hidden sm:inline">{t('drive.view')}</span>
             </a>

@@ -362,8 +362,14 @@ export function LangProvider({ children }) {
       return n > 1 ? t('rel.inDays', { n }) : t('rel.daysAgo', { n: Math.abs(n) });
     };
     const masa = (m) => formatMasa(m, lang);
+    /** User content: the auto-translated `<field>_ar` in Arabic mode, else (or if blank) the original. */
+    const tr = (row, field) => {
+      if (!row) return '';
+      const ar = lang === 'ar' ? String(row[`${field}_ar`] ?? '').trim() : '';
+      return ar || row[field] || '';
+    };
     const serverError = (msg) => (lang === 'ar' && SERVER_ERR_AR[msg]) || msg;
-    return { lang, setLang, dir: lang === 'ar' ? 'rtl' : 'ltr', t, fmt: { hari, date, monthShort, tarikhHari, relative, arDays, masa }, serverError };
+    return { lang, setLang, dir: lang === 'ar' ? 'rtl' : 'ltr', t, tr, fmt: { hari, date, monthShort, tarikhHari, relative, arDays, masa }, serverError };
   }, [lang, setLang]);
 
   return <LangCtx.Provider value={value}>{children}</LangCtx.Provider>;

@@ -109,6 +109,16 @@ function createRuntime() {
     },
     Session: { getScriptTimeZone: () => Intl.DateTimeFormat().resolvedOptions().timeZone },
     Logger: { log: () => {} },
+    // Fake translator: deterministic, visibly Arabic, and able to fail on demand.
+    LanguageApp: {
+      calls: 0,
+      translate(text, from, to) {
+        this.calls++;
+        if (from !== 'ms' || to !== 'ar') throw new Error(`unexpected ${from}->${to}`);
+        if (String(text).includes('GAGAL_TERJEMAH')) throw new Error('quota exceeded');
+        return `ترجمة: ${text}`;
+      },
+    },
   };
   vm.createContext(sandbox);
   const code = fs.readFileSync(path.join(__dirname, '..', 'google-apps-script', 'Code.gs'), 'utf8');

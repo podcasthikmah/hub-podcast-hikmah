@@ -681,8 +681,8 @@ async function scheduleSyncFlow(page, tag, { checkHero = false } = {}) {
       assert.ok(slots.length > 0);
       for (const sl of slots) assert.ok(sl.text.includes(dayAr(sl.id.slice(0, 10))), `Arabic day on ${sl.id}`);
       assert.equal(await p.locator('[data-slot]').first().getByTestId('slot-masa').innerText(), '9:00 مساءً');
-      const firstPanel = sheet(rt, 'PANEL').find((r) => r.tajuk.trim() === slots[0].h3.trim());
-      assert.ok(firstPanel, 'card title is the Sheet value verbatim');
+      const firstPanel = sheet(rt, 'PANEL').find((r) => String(r.tajuk_ar || r.tajuk).trim() === slots[0].h3.trim());
+      assert.ok(firstPanel, 'card title = Arabic translation, or the BM original when not translated');
       // typography: Tajawal for UI, no letter-spacing on Arabic labels, Amiri kept for Quranic text
       assert.match(await p.evaluate(() => getComputedStyle(document.body).fontFamily), /Tajawal/);
       assert.equal(await p.evaluate(() => getComputedStyle(document.querySelector('section p.uppercase')).letterSpacing), 'normal');
@@ -776,6 +776,100 @@ async function scheduleSyncFlow(page, tag, { checkHero = false } = {}) {
       rt.cache.clear();
       assert.equal(await sp.evaluate(() => { const el = document.querySelector('header span[lang="en"]'); return el.scrollHeight > el.clientHeight + 1 || el.scrollWidth > el.clientWidth + 1; }), false, 'brand clipped at 320px (BM, admin)');
       await sctx.close();
+    });
+
+    await step('Translated content: all 7 sections show *_ar in عربي, BM originals in BM, fallback, WA, instant switch', async () => {
+      // what the admin does once after deploying: translate rows created before this feature
+      const res = rt.gs.translateAllExistingRows();
+      assert.equal(res.failed, 0);
+      // a row whose translation fails -> must fall back to the BM text in Arabic mode
+      const fb = (await (await fetch(`http://localhost:${GAS_PORT}/exec`, { method: 'POST', headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify({ pin: PIN, action: 'create', sheet: 'PANEL', item: { tajuk: 'Topik GAGAL_TERJEMAH Khas', nama_panel: 'Ustaz Fallback', tarikh: iso(40) } }) })).json()).data;
+      assert.equal(fb.tajuk_ar, '');
+
+      const c = await browser.newContext({ viewport: { width: 1280, height: 860 }, permissions: ['clipboard-read', 'clipboard-write'] });
+      await stubThumbs(c);
+      await c.addInitScript(() => { try { if (!sessionStorage.getItem('x')) { localStorage.setItem('hph_lang', 'ar'); sessionStorage.setItem('x', '1'); } } catch (e) {} });
+      const p = await c.newPage();
+      watch(p, 'translated');
+      await p.goto(APP + '#upcoming');
+      await synced(p);
+      const S = (n) => sheet(rt, n);
+      const textOf = async (tab) => { await go(p, tab); await p.waitForTimeout(150); return p.locator('main').innerText(); };
+      const expectAll = (txt, rows, fields, label) => {
+        let n = 0;
+        for (const r of rows) for (const f of fields) {
+          const ar = String(r[`${f}_ar`] || '').trim();
+          if (!ar) continue;
+          assert.ok(txt.includes(ar), `${label}: shows ${f}_ar "${ar.slice(0, 40)}"`);
+          n++;
+        }
+        assert.ok(n > 0, `${label}: at least one translated value checked`);
+      };
+
+      // 1) Hero + Upcoming (derived from PANEL: tajuk_ar + panelist names in Arabic, Arabic day/date)
+      const next = S('PANEL').filter((r) => /^\d{4}-/.test(r.tarikh) && r.tarikh >= iso(0)).sort((a, b) => a.tarikh.localeCompare(b.tarikh) || String(a.masa || '99').localeCompare(String(b.masa || '99')))[0];
+      assert.equal((await p.getByRole('heading', { level: 1 }).innerText()).trim(), next.tajuk_ar);
+      let txt = await textOf('upcoming');
+      assert.ok(txt.includes(next.nama_panel_ar), 'Upcoming panelist in Arabic');
+      assert.ok(txt.includes(dayAr(next.tarikh)), 'Arabic day name');
+      // 2) List Panel
+      txt = await textOf('panel');
+      expectAll(txt, S('PANEL'), ['tajuk', 'nama_panel'], 'List Panel');
+      assert.ok(txt.includes('Topik GAGAL_TERJEMAH Khas'), 'blank tajuk_ar falls back to BM');
+      // 3) Panduan
+      expectAll(await textOf('panduan'), S('PANDUAN').filter((r) => r.kategori === 'PANEL'), ['tajuk', 'keterangan'], 'Panduan');
+      // 4) Peringatan
+      expectAll(await textOf('peringatan'), S('PERINGATAN'), ['petikan', 'konteks'], 'Peringatan');
+      // 5) Promosi Kitab (+ script card)
+      txt = await textOf('kitab');
+      expectAll(txt, S('KITAB'), ['nama_kitab'], 'Kitab');
+      expectAll(txt, S('PANDUAN').filter((r) => r.kategori === 'SKRIP_PROMOSI'), ['tajuk', 'keterangan'], 'Skrip promosi');
+      // 6) Episode YT
+      expectAll(await textOf('youtube'), S('YOUTUBE'), ['tajuk'], 'YouTube');
+      // 7) Cadangan (suggestion + admin reply)
+      txt = await textOf('cadangan');
+      expectAll(txt, S('CADANGAN'), ['catatan'], 'Cadangan catatan');
+      expectAll(txt, S('CADANGAN'), ['balasan_admin'], 'Cadangan reply');
+
+      // Salin Info WA follows the UI language
+      await adminLogin(p);
+      await p.waitForSelector('[data-testid="admin-banner"]');
+      rt.cache.clear();
+      await go(p, 'upcoming');
+      await p.locator('[data-slot]').first().getByRole('button', { name: 'نسخ رسالة واتساب' }).click();
+      let clip = await p.evaluate(() => navigator.clipboard.readText());
+      assert.ok(clip.includes(`*العنوان:* ${next.tajuk_ar}`), clip);
+      assert.match(clip, /\*اليوم والتاريخ:\* /);
+      assert.ok(!/Tajuk:|Hari\/Tarikh/.test(clip), 'no BM labels in the Arabic message');
+
+      // instant switch: toggling language makes no network request; BM shows the originals
+      let apiCalls = 0;
+      p.on('request', (r) => { if (/script\.google/.test(r.url())) apiCalls++; });
+      await p.click('[data-lang-option="ms"]');
+      await p.getByRole('heading', { level: 1 }).filter({ hasText: next.tajuk }).waitFor();
+      // the first card's own button (it shows "Disalin!" for 2s after the previous copy)
+      const firstCopy = p.locator('[data-slot]').first().getByRole('button', { name: 'Salin Info WA' });
+      await firstCopy.waitFor({ timeout: 5000 });
+      await firstCopy.click();
+      clip = await p.evaluate(() => navigator.clipboard.readText());
+      assert.ok(clip.includes(`*Tajuk:* ${next.tajuk}`), 'BM message in BM mode');
+      txt = await textOf('panel');
+      assert.ok(txt.includes(next.nama_panel) && !txt.includes(next.nama_panel_ar), 'BM originals in BM mode');
+      await p.click('[data-lang-option="ar"]');
+      await go(p, 'upcoming');
+      await p.getByRole('heading', { level: 1 }).filter({ hasText: next.tajuk_ar }).waitFor();
+      assert.equal(apiCalls, 0, 'language switch served from the cached rows (no fetch)');
+      // both languages survive a reload from cache alone (API blocked)
+      expectNetErrors = true;
+      await p.route(/script\.google/, (r) => r.abort());
+      await p.reload();
+      await p.getByRole('heading', { level: 1 }).filter({ hasText: next.tajuk_ar }).waitFor();
+      await p.click('[data-lang-option="ms"]');
+      await p.getByRole('heading', { level: 1 }).filter({ hasText: next.tajuk }).waitFor();
+      expectNetErrors = false;
+      await c.close();
+      await fetch(`http://localhost:${GAS_PORT}/exec`, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ pin: PIN, action: 'delete', sheet: 'PANEL', id: fb.id }) });
     });
 
     // ------------------------------ FOCUS REGRESSION ------------------------------

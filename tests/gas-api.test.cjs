@@ -211,6 +211,106 @@ const test = async (name, fn) => { await fn(); passed++; console.log('  ✓', na
       assert.equal(ok(await get()).KITAB.find((r) => r.id === k.id).bilangan, 3);
     });
 
+    // ------------------------------ auto-translation BM -> AR ------------------------------
+    const AR = (t) => `ترجمة: ${t}`;
+    const LA = () => rt.gs.LanguageApp;
+    const cell = (sheet, id, col) => { const sh = rt.sheets.get(sheet); const i = sh.data[0].indexOf(col); return sh.data.find((r) => r[0] === id)[i]; };
+
+    await test('translate: every source field in all 6 content tabs gets an _ar value on create', async () => {
+      const cases = {
+        PANEL: { tajuk: 'Adab Ilmu', nama_panel: 'Ustaz Ali', tarikh: '2026-12-10', masa: '21:00' },
+        PANDUAN: { kategori: 'PANEL', tajuk: 'Panduan Baharu', keterangan: 'Baca sebelum rakaman', gdrive_url: 'https://drive.google.com/file/d/1AbCdEfGhIjK/view' },
+        PERINGATAN: { petikan: 'Niat kerana Allah', arab: 'إِنَّمَا الأَعْمَالُ', konteks: 'Taklimat Panel' },
+        KITAB: { nama_kitab: 'Riyadhus Solihin', bilangan: 0 },
+        YOUTUBE: { tajuk: 'EP20 Sabar', youtube_url: 'https://youtu.be/dQw4w9WgXcQ' },
+        CADANGAN: { catatan: 'Tambah sari kata', balasan_admin: 'Baik, terima kasih' },
+      };
+      for (const [sheet, item] of Object.entries(cases)) {
+        const r = ok(await post({ action: 'create', sheet, pin: PIN, item }));
+        const fields = { PANEL: ['tajuk', 'nama_panel'], PANDUAN: ['tajuk', 'keterangan'], PERINGATAN: ['petikan', 'konteks'], KITAB: ['nama_kitab'], YOUTUBE: ['tajuk'], CADANGAN: ['catatan', 'balasan_admin'] }[sheet];
+        const live = ok(await get())[sheet].find((x) => x.id === r.id);
+        for (const f of fields) {
+          assert.equal(r[`${f}_ar`], AR(item[f]), `${sheet}.${f}_ar in response`);
+          assert.equal(live[`${f}_ar`], AR(item[f]), `${sheet}.${f}_ar via getAll`);
+          assert.equal(live[f], item[f], `${sheet}.${f} source unchanged`);
+        }
+        if (sheet === 'PERINGATAN') assert.equal(live.arab_ar, undefined, 'arab is not translated');
+      }
+    });
+
+    await test('translate: public suggestion + admin reply are translated; public cannot write _ar', async () => {
+      const r = ok(await post({ action: 'create', sheet: 'CADANGAN', ownerKey: 'k-tr', item: { catatan: 'Cadangan awam', catatan_ar: 'HACK' } }));
+      assert.equal(r.catatan_ar, AR('Cadangan awam'));
+      const u = ok(await post({ action: 'update', sheet: 'CADANGAN', id: r.id, ownerKey: 'k-tr', patch: { catatan: 'Cadangan awam v2', catatan_ar: 'HACK' } }));
+      assert.equal(u.catatan_ar, AR('Cadangan awam v2'));
+      const u2 = ok(await post({ action: 'update', sheet: 'CADANGAN', id: r.id, ownerKey: 'k-tr', patch: { catatan_ar: 'HACK' } }));
+      assert.equal(u2.catatan_ar, AR('Cadangan awam v2'), 'public _ar write ignored');
+      const a = ok(await post({ action: 'update', sheet: 'CADANGAN', id: r.id, pin: PIN, patch: { balasan_admin: 'Akan dilaksanakan' } }));
+      assert.equal(a.balasan_admin_ar, AR('Akan dilaksanakan'));
+    });
+
+    await test('translate: Arabic / URL / numbers copied, empty stays empty, no translator call', async () => {
+      const before = LA().calls;
+      const r = ok(await post({ action: 'create', sheet: 'PANDUAN', pin: PIN, item: { kategori: 'PANEL', tajuk: 'دليل الضيوف', keterangan: '', gdrive_url: 'https://x.y/z' } }));
+      assert.equal(r.tajuk_ar, 'دليل الضيوف');
+      assert.equal(r.keterangan_ar, '');
+      const y = ok(await post({ action: 'create', sheet: 'YOUTUBE', pin: PIN, item: { tajuk: '2026 · 12', youtube_url: 'https://youtu.be/dQw4w9WgXcQ' } }));
+      assert.equal(y.tajuk_ar, '2026 · 12');
+      const k = ok(await post({ action: 'create', sheet: 'KITAB', pin: PIN, item: { nama_kitab: 'https://kitab.example/x' } }));
+      assert.equal(k.nama_kitab_ar, 'https://kitab.example/x');
+      assert.equal(LA().calls, before, 'no LanguageApp calls');
+    });
+
+    let tr;
+    await test('translate: failure leaves _ar blank (app falls back to BM) and the row still saves', async () => {
+      tr = ok(await post({ action: 'create', sheet: 'PANEL', pin: PIN, item: { tajuk: 'Topik GAGAL_TERJEMAH', nama_panel: 'Ustaz Fail', tarikh: '2026-12-11' } }));
+      assert.equal(tr.tajuk_ar, '');
+      assert.equal(tr.nama_panel_ar, AR('Ustaz Fail'));
+      assert.ok(ok(await get()).PANEL.find((x) => x.id === tr.id));
+    });
+
+    await test('translate: unchanged source = no re-translation; admin correction kept; source change re-translates', async () => {
+      const r = ok(await post({ action: 'create', sheet: 'KITAB', pin: PIN, item: { nama_kitab: 'Al-Hikam' } }));
+      let calls = LA().calls;
+      // the edit form sends the whole row back unchanged (including the old _ar)
+      ok(await post({ action: 'update', sheet: 'KITAB', id: r.id, pin: PIN, patch: { nama_kitab: 'Al-Hikam', nama_kitab_ar: AR('Al-Hikam'), bilangan: 2 } }));
+      assert.equal(LA().calls, calls, 'no translate call when source unchanged');
+      // admin corrects the Arabic (e.g. in the Sheet or via API)
+      ok(await post({ action: 'update', sheet: 'KITAB', id: r.id, pin: PIN, patch: { nama_kitab_ar: 'الحِكَم العطائية' } }));
+      ok(await post({ action: 'update', sheet: 'KITAB', id: r.id, pin: PIN, patch: { nama_kitab: 'Al-Hikam', bilangan: 3 } }));
+      assert.equal(cell('KITAB', r.id, 'nama_kitab_ar'), 'الحِكَم العطائية', 'correction survives unrelated edits');
+      // Malay source changes -> fresh translation wins over the stale client value
+      const u = ok(await post({ action: 'update', sheet: 'KITAB', id: r.id, pin: PIN, patch: { nama_kitab: 'Al-Hikam Syarah', nama_kitab_ar: 'الحِكَم العطائية' } }));
+      assert.equal(u.nama_kitab_ar, AR('Al-Hikam Syarah'));
+    });
+
+    await test('translateAllExistingRows(): fills only missing _ar cells, retries failures, idempotent', async () => {
+      const sh = rt.sheets.get('PANEL');
+      const iT = sh.data[0].indexOf('tajuk_ar');
+      // simulate pre-existing rows from before this feature: blank their _ar cells
+      const blanks = sh.data.slice(1).filter((r) => r[0] && r[0] !== tr.id).slice(0, 3);
+      blanks.forEach((r) => { r[iT] = ''; });
+      // the earlier failed row: fix its source so the retry can succeed
+      sh.data.find((r) => r[0] === tr.id)[sh.data[0].indexOf('tajuk')] = 'Topik Dibetulkan';
+      const res = rt.gs.translateAllExistingRows();
+      assert.ok(res.translated >= blanks.length + 1, JSON.stringify(res));
+      for (const r of blanks) assert.equal(r[iT], AR(r[sh.data[0].indexOf('tajuk')]));
+      assert.equal(cell('PANEL', tr.id, 'tajuk_ar'), AR('Topik Dibetulkan'));
+      const again = rt.gs.translateAllExistingRows();
+      assert.equal(again.translated, 0, 'second run has nothing to do');
+    });
+
+    await test('translate: a tab without _ar columns gets them automatically, then fills them', async () => {
+      const sh = rt.sheets.get('YOUTUBE');
+      const i = sh.data[0].indexOf('tajuk_ar');
+      sh.data.forEach((r) => r.splice(i, 1)); // the live Sheet before this feature
+      ok(await get());
+      assert.ok(sh.data[0].includes('tajuk_ar'));
+      const res = rt.gs.translateAllExistingRows();
+      assert.ok(res.translated >= 1);
+      assert.ok(ok(await get()).YOUTUBE.every((r) => !/[A-Za-z]/.test(r.tajuk) || r.tajuk_ar));
+    });
+
     await test('PIN brute-force guard locks after 10 failures', async () => {
       rt.cache.clear();
       for (let i = 0; i < 10; i++) err(await post({ action: 'verifyPin', pin: 'x' + i }), /PIN salah/);

@@ -14,7 +14,7 @@ const fields = (t) => [
 
 export default function Peringatan() {
   const { db, isAdmin, create, update, remove, reorder } = useData();
-  const { t } = useI18n();
+  const { t, tr } = useI18n();
   const { editing, setEditing, deleting, setDeleting } = useEditor();
   const rows = useMemo(() => [...db.PERINGATAN].sort(byOrder), [db.PERINGATAN]);
   const save = (v) => (editing?.id ? update('PERINGATAN', editing.id, v) : create('PERINGATAN', v));
@@ -47,7 +47,7 @@ export default function Peringatan() {
                   </span>
                   <span className="min-w-0 flex-1 leading-snug">
                     <span className="text-primary">{t('pr.speaker')}</span>
-                    {r.konteks && <span className="wrap-anywhere"><span aria-hidden> · </span><bdi dir="auto">{r.konteks}</bdi></span>}
+                    {r.konteks && <span className="wrap-anywhere"><span aria-hidden> · </span><bdi dir="auto">{tr(r, 'konteks')}</bdi></span>}
                   </span>
                   <Quote size={20} className="shrink-0 text-accent/50" aria-hidden />
                 </figcaption>
@@ -60,7 +60,7 @@ export default function Peringatan() {
                       {r.arab}
                     </p>
                   )}
-                  <blockquote dir="auto" className="text-base leading-[1.75] text-ink wrap-anywhere sm:text-[15px]">{r.petikan}</blockquote>
+                  <blockquote dir="auto" className="text-base leading-[1.75] text-ink wrap-anywhere sm:text-[15px]">{tr(r, 'petikan')}</blockquote>
                   {isAdmin && (
                     <RowActions
                       className="-mx-2 -mb-2 mt-3 justify-end border-t border-line pt-1"

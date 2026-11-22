@@ -9,7 +9,7 @@ import { AddButton, ConfirmModal, Empty, FormModal, SectionHeader, moved, useEdi
 
 export default function Panduan() {
   const { db, isAdmin, create, update, remove, reorder } = useData();
-  const { t } = useI18n();
+  const { t, tr } = useI18n();
   const { editing, setEditing, deleting, setDeleting } = useEditor();
   const rows = useMemo(() => db.PANDUAN.filter((r) => (r.kategori || 'PANEL') === PANDUAN_KATEGORI.PANEL).sort(byOrder), [db.PANDUAN]);
 
@@ -50,7 +50,7 @@ export default function Panduan() {
       )}
 
       <FormModal open={Boolean(editing)} onClose={() => setEditing(null)} title={editing?.id ? t('pd.edit') : t('pd.addTitle')} fields={driveFields(t)} initial={editing} onSubmit={save} />
-      <ConfirmModal open={Boolean(deleting)} onClose={() => setDeleting(null)} onConfirm={() => remove('PANDUAN', deleting.id)} message={t('ui.deleteNamed', { name: deleting?.tajuk })} />
+      <ConfirmModal open={Boolean(deleting)} onClose={() => setDeleting(null)} onConfirm={() => remove('PANDUAN', deleting.id)} message={t('ui.deleteNamed', { name: tr(deleting, 'tajuk') })} />
     </section>
   );
 }

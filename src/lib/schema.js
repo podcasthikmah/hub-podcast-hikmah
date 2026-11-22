@@ -15,6 +15,16 @@ export const SHEETS = {
   CADANGAN: ['id', 'tarikh', 'catatan', 'status', 'balasan_admin', 'created_at'],
 };
 
+// Auto-translated Arabic columns written by Code.gs (mirrors TRANSLATE there). Read-only for the UI.
+export const TRANSLATED = {
+  PANEL: ['tajuk', 'nama_panel'],
+  PANDUAN: ['tajuk', 'keterangan'],
+  PERINGATAN: ['petikan', 'konteks'],
+  KITAB: ['nama_kitab'],
+  YOUTUBE: ['tajuk'],
+  CADANGAN: ['catatan', 'balasan_admin'],
+};
+
 export const PANDUAN_KATEGORI = { PANEL: 'PANEL', SKRIP: 'SKRIP_PROMOSI' };
 export const STATUS = { BELUM: 'BELUM', SELESAI: 'SELESAI' };
 
