@@ -34,10 +34,15 @@ const VIEWPORTS = [
   { name: '390x844', viewport: { width: 390, height: 844 } },
 ];
 const TABS = ['upcoming', 'panel', 'panduan', 'peringatan', 'kitab', 'youtube', 'cadangan'];
-const FORMS = [
-  ['panel', /Tambah Panel/], ['panduan', /Tambah Dokumen/],
-  ['peringatan', /Tambah Peringatan/], ['kitab', /Tambah Kitab/], ['kitab', /Tambah skrip/], ['youtube', /Tambah Episod/],
-];
+const LANGS = ['ms', 'ar'];
+const FORMS = {
+  ms: [['panel', /Tambah Panel/], ['panduan', /Tambah Dokumen/], ['peringatan', /Tambah Peringatan/], ['kitab', /Tambah Kitab/], ['kitab', /Tambah skrip/], ['youtube', /Tambah Episod/]],
+  ar: [['panel', /إضافة ضيف/], ['panduan', /إضافة وثيقة/], ['peringatan', /إضافة توجيه/], ['kitab', /إضافة كتاب/], ['kitab', /إضافة نص/], ['youtube', /إضافة حلقة/]],
+};
+const LABELS = {
+  ms: { edit: 'Edit cadangan', del: 'Padam cadangan' },
+  ar: { edit: 'تعديل المقترح', del: 'حذف المقترح' },
+};
 
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.svg': 'image/svg+xml' };
 const serve = () => new Promise((resolve) => {
@@ -86,7 +91,7 @@ async function useEmulator(ctx) {
 }
 
 /** Runs in the page: objective measurements of the current screen. */
-function measure({ scope, deviceWidth }) {
+function measure({ scope, deviceWidth, lang }) {
   // Compare against the DEVICE width, not innerWidth: on mobile, overflowing content makes the
   // browser widen the layout viewport (page zooms out), so innerWidth would hide the bug.
   const vw = deviceWidth;
@@ -137,6 +142,28 @@ function measure({ scope, deviceWidth }) {
     }
     if (!clipped) issues.push({ type: 'past-edge', detail: `<${el.tagName.toLowerCase()} class="${String(el.className).slice(0, 50)}"> ${Math.round(r.left)}..${Math.round(r.right)}` });
   }
+  // Arabic mode: any visible Latin word that is not user content (dir="auto"), a marked
+  // brand/code (lang="en"/"ms", <code>), or a known technical term = untranslated UI text.
+  if (lang === 'ar') {
+    if (document.documentElement.dir !== 'rtl') issues.push({ type: 'not-rtl', detail: document.documentElement.dir });
+    const OK = /^(PDF|URL|PIN|YouTube|Google|Drive|Apps|Script|WhatsApp|youtube|com|youtu|be|shorts|live|embed|watch|https?|www|src|config|js|EP\d*)$/i;
+    const tw = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    while (tw.nextNode()) {
+      const el = tw.currentNode.parentElement;
+      if (!el || !visible(el) || el.closest('[dir="auto"],[lang="en"],[lang="ms"],code,svg,script,style,[aria-hidden="true"],.sr-only,input,textarea,select,option')) continue;
+      const words = (tw.currentNode.textContent.match(/[A-Za-z][A-Za-z.]*/g) || []).filter((w) => !w.replace(/\.$/, '').split('.').every((x) => OK.test(x)));
+      if (words.length) issues.push({ type: 'untranslated', detail: `"${tw.currentNode.textContent.trim().slice(0, 50)}"` });
+    }
+    for (const el of root.querySelectorAll('[placeholder],[title]')) {
+      if (!visible(el) || el.closest('[dir="auto"],[lang="en"],[lang="ms"]')) continue;
+      for (const attr of ['placeholder', 'title']) {
+        const v = el.getAttribute(attr);
+        if (!v || /:\/\//.test(v)) continue;
+        const words = (v.match(/[A-Za-z][A-Za-z.]*/g) || []).filter((w) => !w.replace(/\.$/, '').split('.').every((x) => OK.test(x)));
+        if (words.length) issues.push({ type: 'untranslated', detail: `${attr}="${v.slice(0, 50)}"` });
+      }
+    }
+  }
   return issues;
 }
 
@@ -151,37 +178,39 @@ function measure({ scope, deviceWidth }) {
   const add = (where, issues) => { for (const i of issues) report.push({ where, ...i }); };
 
   try {
-    for (const vp of VIEWPORTS) {
+    for (const lang of LANGS) for (const vp of VIEWPORTS) {
+      const tag = `${lang}-${vp.name}`;
       const ctx = await browser.newContext({ ...vp, isMobile: true, hasTouch: true, deviceScaleFactor: 2, colorScheme: vp.name === '390x844' ? 'dark' : 'light' });
       await useEmulator(ctx);
+      await ctx.addInitScript((l) => { try { localStorage.setItem('hph_lang', l); } catch (e) {} }, lang);
       // Safari containing-block behaviour for transformed ancestors
       await ctx.addInitScript(() => document.addEventListener('DOMContentLoaded', () => {
         const st = document.createElement('style'); st.textContent = '.animate-fade-up{will-change:transform}'; document.head.appendChild(st);
       }));
       const p = await ctx.newPage();
-      p.on('console', (m) => m.type() === 'error' && errors.push(`${vp.name}: ${m.text()}`));
-      p.on('pageerror', (e) => errors.push(`${vp.name}: ${e.message}`));
+      p.on('console', (m) => m.type() === 'error' && errors.push(`${tag}: ${m.text()}`));
+      p.on('pageerror', (e) => errors.push(`${tag}: ${e.message}`));
       await p.goto(APP + '#upcoming');
       await p.waitForFunction(() => !document.querySelector('.animate-spin') && document.querySelector('h1'));
 
       const go = async (t) => { await p.evaluate((x) => { location.hash = x; window.scrollTo(0, 0); }, t); await p.waitForSelector(`#h-${t}`); await p.waitForTimeout(350); };
       for (const mode of ['public', 'admin']) {
         if (mode === 'admin') {
-          for (let i = 0; i < 5; i++) await p.click('button[aria-label="Hak cipta"]');
-          add(`${vp.name} pin-modal`, await p.evaluate(measure, { scope: 'div[role="dialog"]', deviceWidth: vp.viewport.width }));
-          await p.screenshot({ path: `${OUT}/${vp.name}-modal-pin.png` });
-          await p.fill('input[aria-label="PIN Admin"]', PIN);
-          await p.click('text=Buka Kunci');
-          await p.waitForSelector('button[title="Keluar Mod Admin"]');
+          await p.click('[data-testid="admin-lock"]');
+          add(`${tag} pin-modal`, await p.evaluate(measure, { scope: 'div[role="dialog"]', deviceWidth: vp.viewport.width, lang }));
+          await p.screenshot({ path: `${OUT}/${tag}-modal-pin.png` });
+          await p.fill('div[role="dialog"] input[type="password"]', PIN);
+          await p.click('div[role="dialog"] form button');
+          await p.waitForSelector('[data-testid="admin-banner"]');
         }
         for (const t of TABS) {
           await go(t);
-          add(`${vp.name} ${mode} #${t}`, await p.evaluate(measure, { scope: null, deviceWidth: vp.viewport.width }));
-          await p.screenshot({ path: `${OUT}/${vp.name}-${mode}-${t}.png`, fullPage: true });
+          add(`${tag} ${mode} #${t}`, await p.evaluate(measure, { scope: null, deviceWidth: vp.viewport.width, lang }));
+          await p.screenshot({ path: `${OUT}/${tag}-${mode}-${t}.png`, fullPage: true });
         }
       }
       // forms / modals
-      for (const [t, name] of FORMS) {
+      for (const [t, name] of FORMS[lang]) {
         await go(t);
         await p.evaluate(() => window.scrollTo(0, 400));
         await p.getByRole('button', { name }).first().click();
@@ -191,24 +220,24 @@ function measure({ scope, deviceWidth }) {
           const d = document.querySelector('div[role="dialog"]');
           const sheet = d.querySelector(':scope > div.relative').getBoundingClientRect();
           const body = d.querySelector('[data-modal-body]');
-          const save = [...d.querySelectorAll('button')].find((b) => /Simpan/.test(b.textContent)).getBoundingClientRect();
+          const save = [...d.querySelectorAll('button')].find((b) => /Simpan|حفظ/.test(b.textContent)).getBoundingClientRect();
           return { top: sheet.top, bottom: sheet.bottom, vh: innerHeight, scrollable: body.scrollHeight > body.clientHeight, saveOk: save.bottom <= innerHeight && save.top >= 0 };
         });
-        if (!fit.saveOk || fit.bottom > fit.vh + 1 || fit.top < 0) report.push({ where: `${vp.name} form ${name}`, type: 'modal-fit', detail: JSON.stringify(fit) });
-        add(`${vp.name} form ${name}`, await p.evaluate(measure, { scope: 'div[role="dialog"]', deviceWidth: vp.viewport.width }));
-        await p.screenshot({ path: `${OUT}/${vp.name}-form-${t}-${String(name).replace(/\W+/g, '')}.png` });
+        if (!fit.saveOk || fit.bottom > fit.vh + 1 || fit.top < 0) report.push({ where: `${tag} form ${name}`, type: 'modal-fit', detail: JSON.stringify(fit) });
+        add(`${tag} form ${name}`, await p.evaluate(measure, { scope: 'div[role="dialog"]', deviceWidth: vp.viewport.width, lang }));
+        await p.screenshot({ path: `${OUT}/${tag}-form-${t}-${String(name).replace(/\W+/g, '')}.png` });
         await p.keyboard.press('Escape');
         await p.waitForSelector('div[role="dialog"]', { state: 'detached' });
       }
       // edit form (cadangan) + delete confirm
       await go('cadangan');
-      await p.locator('button[aria-label="Edit cadangan"]').first().click();
-      add(`${vp.name} form Edit Cadangan`, await p.evaluate(measure, { scope: 'div[role="dialog"]', deviceWidth: vp.viewport.width }));
-      await p.screenshot({ path: `${OUT}/${vp.name}-form-cadangan-edit.png` });
+      await p.locator(`button[aria-label="${LABELS[lang].edit}"]`).first().click();
+      add(`${tag} form Edit Cadangan`, await p.evaluate(measure, { scope: 'div[role="dialog"]', deviceWidth: vp.viewport.width, lang }));
+      await p.screenshot({ path: `${OUT}/${tag}-form-cadangan-edit.png` });
       await p.keyboard.press('Escape');
-      await p.locator('button[aria-label="Padam cadangan"]').first().click();
-      add(`${vp.name} confirm-delete`, await p.evaluate(measure, { scope: 'div[role="dialog"]', deviceWidth: vp.viewport.width }));
-      await p.screenshot({ path: `${OUT}/${vp.name}-modal-confirm.png` });
+      await p.locator(`button[aria-label="${LABELS[lang].del}"]`).first().click();
+      add(`${tag} confirm-delete`, await p.evaluate(measure, { scope: 'div[role="dialog"]', deviceWidth: vp.viewport.width, lang }));
+      await p.screenshot({ path: `${OUT}/${tag}-modal-confirm.png` });
       await p.keyboard.press('Escape');
       await ctx.close();
     }

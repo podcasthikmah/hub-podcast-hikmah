@@ -3,10 +3,12 @@ import { Lock, LockOpen } from 'lucide-react';
 import { useData } from '../lib/store.jsx';
 import { CONFIG } from '../config.js';
 import { Modal } from './ui.jsx';
+import { useI18n } from '../lib/i18n.jsx';
 import { Star8 } from './Pattern.jsx';
 
 function AdminPinModal({ open, onClose }) {
   const { login, mode } = useData();
+  const { t, serverError } = useI18n();
   const [pin, setPin] = useState('');
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
@@ -20,16 +22,16 @@ function AdminPinModal({ open, onClose }) {
       setPin('');
       onClose();
     } catch (e2) {
-      setErr(e2.message === 'PIN salah' ? 'PIN tidak sah. Sila cuba lagi.' : e2.message);
+      setErr(e2.message === 'PIN salah' ? t('pin.wrong') : serverError(e2.message));
     } finally {
       setBusy(false);
     }
   };
 
   return (
-    <Modal open={open} onClose={onClose} title="Akses Admin" size="sm">
+    <Modal open={open} onClose={onClose} title={t('pin.title')} size="sm">
       <form onSubmit={submit} className="space-y-4">
-        <p className="text-sm text-muted">Masukkan PIN Admin untuk mengurus semua kandungan hub.</p>
+        <p className="text-sm text-muted">{t('pin.intro')}</p>
         <input
           className="input min-h-12 text-center text-xl tracking-[0.5em]"
           type="password"
@@ -38,12 +40,13 @@ function AdminPinModal({ open, onClose }) {
           placeholder="••••"
           value={pin}
           onChange={(e) => setPin(e.target.value)}
-          aria-label="PIN Admin"
+          aria-label={t('pin.label')}
+          dir="ltr"
           required
         />
         {err && <p className="text-sm font-medium text-danger">{err}</p>}
-        {mode === 'mock' && <p className="text-xs text-muted">Mod demo: PIN lalai ialah <b>{CONFIG.MOCK_ADMIN_PIN}</b> (ubah di <code>src/config.js</code>).</p>}
-        <button className="btn-gold min-h-12 w-full text-base sm:text-sm" disabled={busy || !pin}>{busy ? 'Menyemak…' : 'Buka Kunci'}</button>
+        {mode === 'mock' && <p className="text-xs text-muted">{t('pin.demo', { pin: CONFIG.MOCK_ADMIN_PIN, file: 'src/config.js' })}</p>}
+        <button className="btn-gold min-h-12 w-full text-base sm:text-sm" disabled={busy || !pin}>{busy ? t('pin.checking') : t('pin.unlock')}</button>
       </form>
     </Modal>
   );
@@ -51,6 +54,7 @@ function AdminPinModal({ open, onClose }) {
 
 export function Footer() {
   const { isAdmin, logout } = useData();
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const taps = useRef([]);
 
@@ -68,17 +72,18 @@ export function Footer() {
       <div className="mx-auto flex max-w-6xl flex-col items-center gap-2 px-4 pb-4 pt-7 text-center sm:px-6 sm:py-8">
         <Star8 className="h-5 w-5 text-accent" />
         <p className="max-w-md text-[13px] leading-relaxed text-muted">
-          Hub rujukan bersama untuk penganjur, moderator dan panel. Kongsi pautan ini — tak perlu ulang penerangan dalam group WhatsApp lagi.
+          {t('footer.about')}
         </p>
         <div className="flex items-center">
-          <button onClick={onTap} className="min-h-11 select-none px-2 text-[13px] text-muted/80" aria-label="Hak cipta">
-            © {new Date().getFullYear()} {CONFIG.ORG_NAME}
+          <button onClick={onTap} data-testid="copyright" className="min-h-11 select-none px-2 text-[13px] text-muted/80" aria-label={t('footer.copyright')}>
+            © {new Date().getFullYear()} <span lang="ms" dir="ltr">{CONFIG.ORG_NAME}</span>
           </button>
           <button
             onClick={() => (isAdmin ? logout() : setOpen(true))}
             className="grid h-11 w-11 place-items-center rounded-btn text-muted/40 transition hover:text-muted"
-            aria-label={isAdmin ? 'Keluar Mod Admin' : 'Log masuk Admin'}
-            title={isAdmin ? 'Keluar Mod Admin' : 'Admin'}
+            data-testid="admin-lock"
+            aria-label={isAdmin ? t('admin.logout') : t('admin.login')}
+            title={isAdmin ? t('admin.logout') : t('admin')}
           >
             {isAdmin ? <LockOpen size={14} /> : <Lock size={14} />}
           </button>

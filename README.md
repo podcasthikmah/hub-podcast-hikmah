@@ -19,6 +19,7 @@ Progressive Web App yang mobile-first dan berfungsi sebagai pusat maklumat untuk
 | **Cadangan** | Orang awam boleh hantar dan edit cadangan sendiri. Admin boleh tandakan *Done* (cadangan itu terus dikunci) dan beri maklum balas. Tapisan status tersedia |
 
 Ciri lain:
+- **Dwibahasa BM / العربية:** butang `BM | عربي` di header (pilihan disimpan). Mod Arab menukar seluruh susun atur ke kanan-ke-kiri (RTL), menggunakan fon Tajawal, nama hari & bulan dalam bahasa Arab, dan menterjemah semua teks UI. Kandungan daripada Google Sheets dipaparkan seperti yang dimasukkan. Mesej *Salin Info WA* kekal dalam BM untuk group WhatsApp.
 - **Stale-while-revalidate:** data terakhir dipaparkan serta-merta dari `localStorage`, kemudian disegerak di latar belakang dengan penunjuk segerak.
 - **PWA:** `manifest.json`, service worker, ikon *maskable* dan *Add to Home Screen*.
 - **Mod Admin tersembunyi:** ketik © di footer 5× (atau ikon 🔒), kemudian masukkan PIN yang disahkan oleh server.

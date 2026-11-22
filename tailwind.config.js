@@ -23,6 +23,7 @@ export default {
       fontFamily: {
         sans: ['"Plus Jakarta Sans"', 'Inter', 'system-ui', 'sans-serif'],
         arabic: ['Amiri', '"IBM Plex Sans Arabic"', 'serif'],
+        ui_ar: ['Tajawal', '"Plus Jakarta Sans"', 'system-ui', 'sans-serif'],
       },
       borderRadius: { card: '16px', btn: '12px' },
       boxShadow: {

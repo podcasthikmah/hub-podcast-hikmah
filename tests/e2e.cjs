@@ -88,9 +88,10 @@ const synced = (page) => page.waitForFunction(() => !document.querySelector('.an
 const toast = (page, re) => page.getByRole('status').filter({ hasText: re }).first().waitFor({ timeout: 8000 });
 
 async function adminLogin(page, pin = PIN) {
-  for (let i = 0; i < 5; i++) await page.click('button[aria-label="Hak cipta"]');
-  await page.fill('input[aria-label="PIN Admin"]', pin);
-  await page.click('text=Buka Kunci');
+  // One-tap lock button (deterministic). The 5-tap © gesture has its own dedicated test.
+  await page.click('[data-testid="admin-lock"]');
+  await page.fill('div[role="dialog"] input[type="password"]', pin);
+  await page.click('div[role="dialog"] form button');
 }
 const go = async (page, tab) => {
   await page.evaluate((t) => { location.hash = t; }, tab);
@@ -364,12 +365,21 @@ async function scheduleSyncFlow(page, tag, { checkHero = false } = {}) {
     });
 
     // ------------------------------ ADMIN ------------------------------
+    await step('Admin trigger: 5 quick taps on © open the PIN dialog', async () => {
+      await page.locator('[data-testid="copyright"]').scrollIntoViewIfNeeded();
+      // dispatch the 5 taps inside one evaluate so they all land within the 2.5s window
+      await page.evaluate(() => { const b = document.querySelector('[data-testid="copyright"]'); for (let i = 0; i < 5; i++) b.click(); });
+      await page.waitForSelector('div[role="dialog"] input[type="password"]');
+      await page.keyboard.press('Escape');
+      await page.waitForSelector('div[role="dialog"]', { state: 'detached' });
+    });
+
     await step('Admin: wrong PIN rejected, right PIN unlocks', async () => {
       await adminLogin(page, '000000');
       await page.waitForSelector('text=PIN tidak sah');
-      await page.fill('input[aria-label="PIN Admin"]', PIN);
-      await page.click('text=Buka Kunci');
-      await page.waitForSelector('button[title="Keluar Mod Admin"]');
+      await page.fill('div[role="dialog"] input[type="password"]', PIN);
+      await page.click('div[role="dialog"] form button');
+      await page.waitForSelector('[data-testid="admin-banner"]');
       rt.cache.clear(); // reset brute-force counter
     });
 
@@ -483,12 +493,12 @@ async function scheduleSyncFlow(page, tag, { checkHero = false } = {}) {
 
     await step('Stale PIN: admin action after PIN change -> error + auto logout', async () => {
       await adminLogin(page);
-      await page.waitForSelector('button[title="Keluar Mod Admin"]');
+      await page.waitForSelector('[data-testid="admin-banner"]');
       rt.props.set('ADMIN_PIN', '999999');
       await go(page, 'kitab');
       await page.locator('button[aria-label="Tambah Riyadhus Solihin"]').click();
       await toast(page, /PIN salah/);
-      await page.waitForSelector('button[title="Keluar Mod Admin"]', { state: 'detached' });
+      await page.waitForSelector('[data-testid="admin-banner"]', { state: 'detached' });
       rt.props.set('ADMIN_PIN', PIN);
       rt.cache.clear();
     });
@@ -554,7 +564,7 @@ async function scheduleSyncFlow(page, tag, { checkHero = false } = {}) {
         const tabs = ['upcoming', 'panel', 'panduan', 'peringatan', 'kitab', 'youtube', 'cadangan'];
         for (const t of tabs) { await go(mp, t); await noHorizontalScroll(mp, `${dev} public #${t}`); }
         await adminLogin(mp);
-        await mp.waitForSelector('button[title="Keluar Mod Admin"]');
+        await mp.waitForSelector('[data-testid="admin-banner"]');
         rt.cache.clear();
         for (const t of tabs) { await go(mp, t); await noHorizontalScroll(mp, `${dev} admin #${t}`); }
         // Every "add" form, opened after scrolling down: overlay must cover the viewport and
@@ -624,10 +634,138 @@ async function scheduleSyncFlow(page, tag, { checkHero = false } = {}) {
       await mp.goto(APP + '#upcoming');
       await synced(mp);
       await adminLogin(mp);
-      await mp.waitForSelector('button[title="Keluar Mod Admin"]');
+      await mp.waitForSelector('[data-testid="admin-banner"]');
       rt.cache.clear();
       await scheduleSyncFlow(mp, 'M');
       await mctx.close();
+    });
+
+    // ------------------------------ BILINGUAL BM / العربية ------------------------------
+    const HARI_AR = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+    const dayAr = (iso) => { const [y, m, d] = iso.split('-').map(Number); return HARI_AR[new Date(y, m - 1, d).getDay()]; };
+    const htmlState = (pg) => pg.evaluate(() => ({ lang: document.documentElement.lang, dir: document.documentElement.dir, saved: localStorage.getItem('hph_lang') }));
+
+    await step('i18n desktop: toggle -> RTL + Arabic UI, persists across reload, data unchanged, back to BM', async () => {
+      // a "Belum Ditentukan" row to check the translated status (stored value must stay BM)
+      const tbd = (await (await fetch(`http://localhost:${GAS_PORT}/exec`, { method: 'POST', headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify({ pin: PIN, action: 'create', sheet: 'PANEL', item: { tajuk: 'Rezeki & Tawakal', nama_panel: 'Ustaz i18n TBD', tarikh: 'Belum Ditentukan' } }) })).json()).data;
+      const c = await browser.newContext({ viewport: { width: 1280, height: 860 } });
+      await stubThumbs(c);
+      const p = await c.newPage();
+      watch(p, 'i18n-desktop');
+      await p.goto(APP + '#upcoming');
+      await synced(p);
+      assert.deepEqual(await htmlState(p), { lang: 'ms', dir: 'ltr', saved: null }, 'BM by default');
+      await p.click('[data-lang-option="ar"]');
+      assert.deepEqual(await htmlState(p), { lang: 'ar', dir: 'rtl', saved: 'ar' });
+      assert.equal(await p.getAttribute('[data-lang-option="ar"]', 'aria-pressed'), 'true');
+      // persists + applied before React renders (inline script in index.html)
+      await p.reload();
+      assert.deepEqual(await htmlState(p), { lang: 'ar', dir: 'rtl', saved: 'ar' });
+      await synced(p);
+      // translated section titles / nav
+      await p.waitForSelector('#h-upcoming:has-text("البودكاست القادم")');
+      const navText = await p.locator('header nav').innerText();
+      for (const w of ['القادم', 'قائمة الضيوف', 'الدليل', 'التوجيهات', 'التعريف بالكتب', 'الحلقات', 'المقترحات']) assert.ok(navText.includes(w), `nav has ${w}`);
+      // Arabic day names on derived schedule cards; user content (tajuk) untouched
+      const slots = await p.locator('[data-slot]').evaluateAll((els) => els.map((e) => ({ id: e.getAttribute('data-slot'), text: e.innerText, h3: e.querySelector('h3').innerText })));
+      assert.ok(slots.length > 0);
+      for (const sl of slots) assert.ok(sl.text.includes(dayAr(sl.id.slice(0, 10))), `Arabic day on ${sl.id}`);
+      const firstPanel = sheet(rt, 'PANEL').find((r) => r.tajuk.trim() === slots[0].h3.trim());
+      assert.ok(firstPanel, 'card title is the Sheet value verbatim');
+      // typography: Tajawal for UI, no letter-spacing on Arabic labels, Amiri kept for Quranic text
+      assert.match(await p.evaluate(() => getComputedStyle(document.body).fontFamily), /Tajawal/);
+      assert.equal(await p.evaluate(() => getComputedStyle(document.querySelector('section p.uppercase')).letterSpacing), 'normal');
+      // geometry mirrors: brand on the right, desktop nav to its left, CTA arrow flipped
+      const brand = await p.locator('header a[href="#upcoming"]').first().boundingBox();
+      assert.ok(brand.x + brand.width > 1280 / 2 + 200, 'brand on the right in RTL');
+      assert.match(await p.evaluate(() => getComputedStyle(document.querySelector('button.btn-gold svg.flip-rtl')).transform), /^matrix\(-1/);
+      // List Panel: TBD shown as "غير محدد", Sheet keeps "Belum Ditentukan"
+      await go(p, 'panel');
+      await p.locator(`li[data-panel-id="${tbd.id}"]`).getByText('غير محدد').waitFor();
+      assert.equal(sheet(rt, 'PANEL').find((r) => r.id === tbd.id).tarikh, 'Belum Ditentukan');
+      assert.match(await p.locator('section p.text-\\[13px\\]').first().innerText(), /^عدد السجلات: \d+$/);
+      // Admin flow in Arabic: form labels, live Arabic day preview, saved data stays BM-coded
+      await adminLogin(p);
+      await p.waitForSelector('[data-testid="admin-banner"]:has-text("وضع المشرف مفعّل")');
+      rt.cache.clear();
+      await p.getByRole('button', { name: /إضافة ضيف/ }).click();
+      await p.getByRole('dialog').getByText('غير محدد').waitFor();
+      await p.fill('#f-tajuk', 'Tajuk i18n');
+      await p.fill('#f-nama_panel', 'Ustaz i18n AR');
+      await p.fill('#f-tarikh', iso(6));
+      assert.ok((await p.getByTestId('hari-preview').innerText()).startsWith(`${dayAr(iso(6))}، `));
+      await p.check('#f-tbd');
+      await p.getByRole('dialog').getByRole('button', { name: 'حفظ' }).click();
+      await toast(p, /تم حفظ الضيف/);
+      await synced(p);
+      assert.equal(sheet(rt, 'PANEL').find((r) => r.nama_panel === 'Ustaz i18n AR').tarikh, 'Belum Ditentukan');
+      // Peringatan bubble tail sits on the start (right) side in RTL
+      await go(p, 'peringatan');
+      const tail = await p.locator('figure span.absolute').first().boundingBox();
+      const bubble = await p.locator('figure > div.relative').first().boundingBox();
+      assert.ok(tail.x > bubble.x + bubble.width - 10, 'bubble tail on the right in RTL');
+      // back to BM
+      await p.click('[data-lang-option="ms"]');
+      assert.deepEqual(await htmlState(p), { lang: 'ms', dir: 'ltr', saved: 'ms' });
+      await go(p, 'upcoming');
+      await p.waitForSelector('#h-upcoming:has-text("Upcoming Podcast")');
+      // cleanup
+      for (const id of [tbd.id, sheet(rt, 'PANEL').find((r) => r.nama_panel === 'Ustaz i18n AR').id]) {
+        await fetch(`http://localhost:${GAS_PORT}/exec`, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ pin: PIN, action: 'delete', sheet: 'PANEL', id }) });
+      }
+      await c.close();
+    });
+
+    await step('i18n mobile (iPhone 13, AR): bottom bar mirrored, Lagi sheet, no overflow, brand unclipped, banner logout', async () => {
+      const mctx = await browser.newContext({ ...devices['iPhone 13'] });
+      await stubThumbs(mctx);
+      await mctx.addInitScript(() => { try { if (!sessionStorage.getItem('x')) { localStorage.setItem('hph_lang', 'ar'); sessionStorage.setItem('x', '1'); } } catch (e) {} });
+      const mp = await mctx.newPage();
+      watch(mp, 'i18n-mobile');
+      await mp.goto(APP + '#upcoming');
+      await synced(mp);
+      assert.equal((await htmlState(mp)).dir, 'rtl');
+      const bar = mp.getByRole('navigation', { name: 'الأقسام الرئيسية' });
+      const first = await bar.getByRole('link', { name: 'القادم' }).boundingBox();
+      const more = await bar.getByRole('button', { name: 'المزيد' }).boundingBox();
+      assert.ok(first.x > more.x, 'first tab on the right, "More" on the left (RTL)');
+      await bar.getByRole('button', { name: 'المزيد' }).click();
+      await mp.getByRole('dialog', { name: 'أقسام أخرى' }).getByRole('link', { name: /التعريف بالكتب/ }).click();
+      await mp.waitForSelector('#h-kitab:has-text("التعريف بالكتب")');
+      const W = 390;
+      for (const tab of ['upcoming', 'panel', 'panduan', 'peringatan', 'kitab', 'youtube', 'cadangan']) {
+        await go(mp, tab);
+        const o = await mp.evaluate(() => ({ sw: document.documentElement.scrollWidth, iw: innerWidth }));
+        assert.ok(o.sw <= W && o.iw <= W, `AR #${tab}: overflow ${JSON.stringify(o)}`);
+      }
+      // brand fully visible (wraps, never clipped/ellipsized) even in admin mode
+      const brandClipped = () => mp.evaluate(() => {
+        const el = document.querySelector('header span[lang="en"]');
+        return el.scrollHeight > el.clientHeight + 1 || el.scrollWidth > el.clientWidth + 1;
+      });
+      assert.equal(await brandClipped(), false, 'brand clipped (public)');
+      await adminLogin(mp);
+      await mp.waitForSelector('[data-testid="admin-banner"]');
+      rt.cache.clear();
+      assert.equal(await brandClipped(), false, 'brand clipped (admin)');
+      // phones: logout lives in the admin banner
+      await mp.getByTestId('admin-banner').getByRole('button', { name: 'خروج' }).click();
+      await mp.waitForSelector('[data-testid="admin-banner"]', { state: 'detached' });
+      await mctx.close();
+
+      // BM at the narrowest common phone (320px): brand not clipped either
+      const sctx = await browser.newContext({ ...devices['iPhone SE'] });
+      await stubThumbs(sctx);
+      const sp = await sctx.newPage();
+      watch(sp, 'brand-320');
+      await sp.goto(APP);
+      await synced(sp);
+      await adminLogin(sp);
+      await sp.waitForSelector('[data-testid="admin-banner"]');
+      rt.cache.clear();
+      assert.equal(await sp.evaluate(() => { const el = document.querySelector('header span[lang="en"]'); return el.scrollHeight > el.clientHeight + 1 || el.scrollWidth > el.clientWidth + 1; }), false, 'brand clipped at 320px (BM, admin)');
+      await sctx.close();
     });
 
     // ------------------------------ FOCUS REGRESSION ------------------------------
@@ -639,7 +777,7 @@ async function scheduleSyncFlow(page, tag, { checkHero = false } = {}) {
       await p.goto(APP + '#panel');
       await synced(p);
       await adminLogin(p);
-      await p.waitForSelector('button[title="Keluar Mod Admin"]');
+      await p.waitForSelector('[data-testid="admin-banner"]');
       rt.cache.clear();
       await p.click('text=Tambah Panel');
       await p.click('#f-nama_panel');
