@@ -3,9 +3,9 @@ import { Header } from './components/Header.jsx';
 import { BottomNav } from './components/BottomNav.jsx';
 import { Hero } from './components/Hero.jsx';
 import { Footer } from './components/Footer.jsx';
-import { TABS } from './components/nav.js';
 import { StarPattern } from './components/Pattern.jsx';
 import { useData } from './lib/store.jsx';
+import { useI18n } from './lib/i18n.jsx';
 import Upcoming from './sections/Upcoming.jsx';
 import PanelList from './sections/PanelList.jsx';
 import Panduan from './sections/Panduan.jsx';
@@ -23,7 +23,8 @@ const fromHash = () => {
 export default function App() {
   const [tab, setTabState] = useState(fromHash);
   const contentRef = useRef(null);
-  const { isAdmin, mode, hasData, error, syncing, refresh } = useData();
+  const { isAdmin, mode, hasData, error, syncing, refresh, logout } = useData();
+  const { t, lang } = useI18n();
 
   useEffect(() => {
     const onHash = () => setTabState(fromHash());
@@ -39,8 +40,8 @@ export default function App() {
   }, []);
 
   const Section = SECTIONS[tab];
-  const title = TABS.find((t) => t.id === tab)?.full;
-  useEffect(() => { document.title = `${title} · Hub Podcast Hikmah`; }, [title]);
+  const title = t(`nav.${tab}.full`);
+  useEffect(() => { document.title = `${title} · Hub Podcast Hikmah`; }, [title, lang]);
 
   return (
     // bottom padding = tab bar (64px) + home-indicator safe area on phones/tablets
@@ -51,8 +52,14 @@ export default function App() {
       <Header tab={tab} setTab={setTab} />
 
       {isAdmin && (
-        <div className="border-b border-accent/30 bg-accent/15 text-center text-[13px] font-semibold text-ink">
-          <p className="mx-auto max-w-6xl px-4 py-2">Mod Admin aktif — tambah, edit, susun & padam kandungan.</p>
+        <div data-testid="admin-banner" className="border-b border-accent/30 bg-accent/15 text-[13px] font-semibold text-ink">
+          <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-1 sm:px-6 sm:py-2">
+            <p className="flex-1 sm:text-center">{t('admin.banner')}</p>
+            {/* phones: the header chip is hidden to save space, so logout lives here */}
+            <button onClick={logout} className="btn-ghost min-h-11 shrink-0 bg-surface px-3 sm:hidden" title={t('admin.logout')}>
+              {t('admin.logoutShort')}
+            </button>
+          </div>
         </div>
       )}
 
@@ -65,12 +72,12 @@ export default function App() {
             </div>
           ) : error && !syncing ? (
             <div className="card flex flex-col items-center gap-3 px-6 py-12 text-center">
-              <p className="font-semibold text-ink">Tidak dapat memuatkan data</p>
+              <p className="font-semibold text-ink">{t('load.failed')}</p>
               <p className="max-w-sm text-sm text-muted">{error}</p>
-              <button className="btn-gold" onClick={() => refresh({ silent: false })}>Cuba lagi</button>
+              <button className="btn-gold" onClick={() => refresh({ silent: false })}>{t('load.retry')}</button>
             </div>
           ) : (
-            <div className="space-y-4" aria-busy="true" aria-label="Memuatkan">
+            <div className="space-y-4" aria-busy="true" aria-label={t('load.loading')}>
               <div className="h-7 w-48 animate-pulse rounded bg-line" />
               <div className="grid gap-4 md:grid-cols-2">
                 {[0, 1, 2, 3].map((i) => <div key={i} className="h-40 animate-pulse rounded-card bg-line/70" />)}
@@ -80,7 +87,7 @@ export default function App() {
         </div>
         {mode === 'mock' && (
           <p className="mt-10 rounded-btn border border-dashed border-line px-4 py-3 text-center text-xs text-muted">
-            Mod Demo: data disimpan dalam pelayar ini sahaja. Sambungkan Google Apps Script di <code>src/config.js</code> untuk segerak merentas peranti.
+            {t('mock.notice', { file: 'src/config.js' })}
           </p>
         )}
       </main>

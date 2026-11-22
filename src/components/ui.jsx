@@ -2,8 +2,10 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ArrowDown, ArrowUp, Pencil, Trash2, X, Plus, Inbox } from 'lucide-react';
 import { cx } from '../lib/utils.js';
+import { useI18n } from '../lib/i18n.jsx';
 
 export function Modal({ open, onClose, title, children, footer, size = 'md' }) {
+  const { t } = useI18n();
   const ref = useRef(null);
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
@@ -49,7 +51,7 @@ export function Modal({ open, onClose, title, children, footer, size = 'md' }) {
         <div aria-hidden className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-line sm:hidden" />
         <div className="flex shrink-0 items-center justify-between gap-3 border-b border-line py-1.5 pl-5 pr-2 sm:py-2.5">
           <h3 className="min-w-0 text-[17px] font-bold text-ink sm:text-base">{title}</h3>
-          <button className="btn-icon" onClick={onClose} aria-label="Tutup"><X size={20} /></button>
+          <button className="btn-icon" onClick={onClose} aria-label={t('ui.close')}><X size={20} /></button>
         </div>
         <div data-modal-body className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-5 [-webkit-overflow-scrolling:touch]">{children}</div>
         {footer && (
@@ -68,7 +70,8 @@ export function Modal({ open, onClose, title, children, footer, size = 'md' }) {
  * Generic form modal. fields: [{ name, label, type: text|textarea|date|url|number|select, required, placeholder, help, options, dir }]
  * onSubmit(values) -> truthy to close.
  */
-export function FormModal({ open, onClose, title, fields, initial, onSubmit, submitLabel = 'Simpan', onChange }) {
+export function FormModal({ open, onClose, title, fields, initial, onSubmit, submitLabel, onChange }) {
+  const { t } = useI18n();
   const [values, setValues] = useState(() => ({ ...(initial || {}) }));
   const [busy, setBusy] = useState(false);
   // Load `initial` the moment the modal opens, during render (not in an effect), so the
@@ -101,8 +104,8 @@ export function FormModal({ open, onClose, title, fields, initial, onSubmit, sub
       title={title}
       footer={
         <>
-          <button type="button" className="btn-ghost" onClick={onClose}>Batal</button>
-          <button type="submit" form="form-modal" className="btn-gold" disabled={busy}>{busy ? 'Menyimpan…' : submitLabel}</button>
+          <button type="button" className="btn-ghost" onClick={onClose}>{t('ui.cancel')}</button>
+          <button type="submit" form="form-modal" className="btn-gold" disabled={busy}>{busy ? t('ui.saving') : submitLabel || t('ui.save')}</button>
         </>
       }
     >
@@ -148,7 +151,7 @@ export function FormModal({ open, onClose, title, fields, initial, onSubmit, sub
             value: values[f.name] ?? '',
             onChange: (e) => set(f.name, e.target.value),
             className: cx('input', f.dir === 'rtl' && 'arabic text-right text-lg', disabled && 'cursor-not-allowed opacity-50'),
-            dir: f.dir,
+            dir: f.dir || (f.type === 'url' ? 'ltr' : undefined), // links always read LTR
             maxLength: f.maxLength,
           };
           return (
@@ -175,21 +178,22 @@ export function FormModal({ open, onClose, title, fields, initial, onSubmit, sub
   );
 }
 
-export function ConfirmModal({ open, onClose, onConfirm, title = 'Padam rekod?', message = 'Tindakan ini tidak boleh dibatalkan.' }) {
+export function ConfirmModal({ open, onClose, onConfirm, title, message }) {
+  const { t } = useI18n();
   return (
     <Modal
       open={open}
       onClose={onClose}
-      title={title}
+      title={title || t('ui.confirmTitle')}
       size="sm"
       footer={
         <>
-          <button className="btn-ghost" onClick={onClose}>Batal</button>
-          <button className="btn bg-danger text-white hover:brightness-110" onClick={() => { onConfirm(); onClose(); }}>Padam</button>
+          <button className="btn-ghost" onClick={onClose}>{t('ui.cancel')}</button>
+          <button className="btn bg-danger text-white hover:brightness-110" onClick={() => { onConfirm(); onClose(); }}>{t('ui.delete')}</button>
         </>
       }
     >
-      <p className="text-sm text-muted">{message}</p>
+      <p className="text-sm text-muted">{message || t('ui.confirmBody')}</p>
     </Modal>
   );
 }
@@ -207,34 +211,37 @@ export function SectionHeader({ eyebrow, title, desc, action }) {
   );
 }
 
-export function AddButton({ onClick, children = 'Tambah' }) {
+export function AddButton({ onClick, children }) {
+  const { t } = useI18n();
   return (
     <button className="btn-gold self-start sm:self-auto" onClick={onClick}>
-      <Plus size={16} strokeWidth={2.4} /> {children}
+      <Plus size={16} strokeWidth={2.4} /> {children || t('ui.add')}
     </button>
   );
 }
 
 /** Admin inline toolbar: edit / delete / move. */
 export function RowActions({ onEdit, onDelete, onUp, onDown, className = '', tone = 'default' }) {
+  const { t } = useI18n();
   const b = tone === 'onBrand' ? 'btn-icon text-on-brand/70 hover:bg-white/10 hover:text-on-brand' : 'btn-icon';
   return (
     <div className={cx('flex items-center gap-0.5', className)}>
-      {onUp && <button className={b} onClick={onUp} aria-label="Naik"><ArrowUp size={16} /></button>}
-      {onDown && <button className={b} onClick={onDown} aria-label="Turun"><ArrowDown size={16} /></button>}
-      {onEdit && <button className={b} onClick={onEdit} aria-label="Edit"><Pencil size={16} /></button>}
+      {onUp && <button className={b} onClick={onUp} aria-label={t('ui.up')}><ArrowUp size={16} /></button>}
+      {onDown && <button className={b} onClick={onDown} aria-label={t('ui.down')}><ArrowDown size={16} /></button>}
+      {onEdit && <button className={b} onClick={onEdit} aria-label={t('ui.edit')}><Pencil size={16} /></button>}
       {onDelete && (
-        <button className={cx(b, 'hover:!text-danger')} onClick={onDelete} aria-label="Padam"><Trash2 size={16} /></button>
+        <button className={cx(b, 'hover:!text-danger')} onClick={onDelete} aria-label={t('ui.delete')}><Trash2 size={16} /></button>
       )}
     </div>
   );
 }
 
-export function Empty({ icon: Icon = Inbox, title = 'Tiada rekod', hint }) {
+export function Empty({ icon: Icon = Inbox, title, hint }) {
+  const { t } = useI18n();
   return (
     <div className="card flex flex-col items-center gap-2 px-6 py-12 text-center">
       <span className="mb-1 grid h-12 w-12 place-items-center rounded-full bg-accent/15 text-primary"><Icon size={22} strokeWidth={1.8} /></span>
-      <p className="font-semibold text-ink">{title}</p>
+      <p className="font-semibold text-ink">{title || t('ui.empty')}</p>
       {hint && <p className="max-w-xs text-sm text-muted">{hint}</p>}
     </div>
   );

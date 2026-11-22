@@ -3,6 +3,7 @@ import { api } from './api.js';
 import { emptyDB } from './schema.js';
 import { buildSeed } from './seed.js';
 import { storage, store, uid } from './utils.js';
+import { useI18n } from './i18n.jsx';
 
 const CACHE_KEY = 'hph_cache_v1';
 const MINE_KEY = 'hph_my_cadangan';   // { [id]: ownerKey }
@@ -19,6 +20,10 @@ function readPin() {
 }
 
 export function DataProvider({ children }) {
+  const { t, serverError } = useI18n();
+  // refresh() reads t via a ref so a language switch doesn't recreate it (and re-fetch).
+  const tRef = useRef(t);
+  tRef.current = t;
   // Stale-while-revalidate: render cached JSON instantly (or seed on very first mock run).
   const cached = storage(CACHE_KEY, null);
   const [db, setDb] = useState(() => cached?.data || (api.mode === 'mock' ? buildSeed() : emptyDB()));
@@ -51,7 +56,7 @@ export function DataProvider({ children }) {
       setError(null);
     } catch (e) {
       setError(e.message || 'Gagal menyegerak');
-      if (!silent) toast('Gagal menyegerak data. Memaparkan salinan terakhir.', 'err');
+      if (!silent) toast(tRef.current('toast.syncFailed'), 'err');
     } finally {
       setSyncing(false);
     }
@@ -75,7 +80,7 @@ export function DataProvider({ children }) {
   /** Rows created optimistically carry a temp id until the server answers. */
   const notReady = (...ids) => {
     if (ids.flat().some((id) => String(id).startsWith('tmp_'))) {
-      toast('Sila tunggu, rekod sedang disimpan…', 'err');
+      toast(t('toast.wait'), 'err');
       return true;
     }
     return false;
@@ -102,7 +107,7 @@ export function DataProvider({ children }) {
     } catch (e) {
       setDb(snapshot);
       persistLocal(snapshot);
-      toast(e.message || 'Ralat tidak dijangka', 'err');
+      toast(serverError(e.message) || t('toast.unexpected'), 'err');
       failed = true;
       if (e.message === 'PIN salah') dropPin(); // PIN changed on server -> leave admin mode
       return null; // callers treat null as failure
@@ -113,7 +118,7 @@ export function DataProvider({ children }) {
       if (failed && pending.current === 0) setTimeout(() => refreshRef.current(), 0);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pin, toast, lastSync]);
+  }, [pin, toast, lastSync, serverError, t]);
 
   const replaceRow = (sheet, tempId, row) =>
     setDb((cur) => {
@@ -123,7 +128,7 @@ export function DataProvider({ children }) {
     });
 
   const actions = useMemo(() => ({
-    async create(sheet, item, msg = 'Berjaya ditambah') {
+    async create(sheet, item, msg = t('toast.added')) {
       const tempId = uid('tmp_');
       const isPublicCad = sheet === 'CADANGAN';
       const ownerKey = isPublicCad ? uid('k_') + uid() : undefined;
@@ -143,7 +148,7 @@ export function DataProvider({ children }) {
       }
       return row;
     },
-    async update(sheet, id, patch, msg = 'Perubahan disimpan') {
+    async update(sheet, id, patch, msg = t('toast.saved')) {
       if (notReady(id)) return null;
       const row = await mutate(
         (cur) => ({ ...cur, [sheet]: cur[sheet].map((r) => (r.id === id ? { ...r, ...patch } : r)) }),
@@ -158,7 +163,7 @@ export function DataProvider({ children }) {
       return mutate(
         (cur) => ({ ...cur, [sheet]: cur[sheet].filter((r) => r.id !== id) }),
         { action: 'delete', sheet, id },
-        'Rekod dipadam',
+        t('toast.deleted'),
       );
     },
     reorder(sheet, ids) {
@@ -187,19 +192,19 @@ export function DataProvider({ children }) {
       );
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [mutate, mine]);
+  }), [mutate, mine, t]);
 
   const login = useCallback(async (p) => {
     await api.post({ action: 'verifyPin', pin: p });
     try { sessionStorage.setItem(PIN_KEY, p); } catch { /* noop */ }
     setPin(p);
-    toast('Mod Admin diaktifkan');
-  }, [toast]);
+    toast(t('toast.adminOn'));
+  }, [toast, t]);
 
   const logout = useCallback(() => {
     dropPin();
-    toast('Keluar dari Mod Admin');
-  }, [toast]);
+    toast(t('toast.adminOff'));
+  }, [toast, t]);
 
   const value = {
     db, syncing, error, lastSync, hasData, mode: api.mode,

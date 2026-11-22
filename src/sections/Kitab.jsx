@@ -3,20 +3,22 @@ import { ArrowDownUp, BookMarked, Minus, Plus } from 'lucide-react';
 import { useData } from '../lib/store.jsx';
 import { byOrder, cx } from '../lib/utils.js';
 import { PANDUAN_KATEGORI } from '../lib/schema.js';
-import { DriveCard, DRIVE_FIELDS } from '../components/DriveCard.jsx';
+import { DriveCard, driveFields } from '../components/DriveCard.jsx';
+import { useI18n } from '../lib/i18n.jsx';
 import { AddButton, ConfirmModal, Empty, FormModal, RowActions, SectionHeader, useEditor } from '../components/ui.jsx';
 
-const FIELDS = [
-  { name: 'nama_kitab', label: 'Nama Kitab', required: true, placeholder: 'cth. Riyadhus Solihin' },
-  { name: 'bilangan', label: 'Bilangan Kekerapan Promosi', type: 'number', min: 0, placeholder: '0' },
+const fields = (t) => [
+  { name: 'nama_kitab', label: t('kb.f.nama'), required: true, placeholder: t('kb.f.namaPh') },
+  { name: 'bilangan', label: t('kb.f.bil'), type: 'number', min: 0, placeholder: '0' },
 ];
 
 function Badge({ n }) {
+  const { t } = useI18n();
   return (
     <span
       className={cx('grid h-11 min-w-[3.25rem] shrink-0 place-items-center rounded-full px-2.5 text-base font-extrabold tabular-nums', n === 0 ? 'bg-ink/5 text-muted' : 'bg-accent text-on-accent')}
-      aria-label={`${n} kali dipromosi`}
-      title="Bilangan kekerapan promosi"
+      aria-label={t('kb.timesAria', { n })}
+      title={t('kb.times')}
     >
       {n}×
     </span>
@@ -25,6 +27,7 @@ function Badge({ n }) {
 
 export default function Kitab() {
   const { db, isAdmin, create, update, remove, increment } = useData();
+  const { t } = useI18n();
   const book = useEditor();
   const script = useEditor();
   const [asc, setAsc] = useState(true);
@@ -46,23 +49,23 @@ export default function Kitab() {
   return (
     <section aria-labelledby="h-kitab">
       <SectionHeader
-        eyebrow="Promosi"
-        title={<span id="h-kitab">Promosi Kitab</span>}
-        desc="Pantau kekerapan promosi setiap kitab supaya giliran adil. Kitab paling kurang dipromosi dipaparkan dahulu."
-        action={isAdmin && <AddButton onClick={() => book.setEditing({ bilangan: 0 })}>Tambah Kitab</AddButton>}
+        eyebrow={t('kb.eyebrow')}
+        title={<span id="h-kitab">{t('kb.title')}</span>}
+        desc={t('kb.desc')}
+        action={isAdmin && <AddButton onClick={() => book.setEditing({ bilangan: 0 })}>{t('kb.add')}</AddButton>}
       />
 
       {/* grid-cols-1 + min-w-0: a long nowrap kitab name must not widen the column past the screen */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
         <div className="min-w-0">
           <div className="mb-1 flex items-center justify-between gap-3">
-            <p className="text-[13px] font-medium text-muted">{rows.length} kitab</p>
-            <button className="hit -mr-2 gap-1.5 rounded-btn px-2 text-[13px] font-semibold text-muted hover:text-ink" onClick={() => setAsc((a) => !a)}>
-              <ArrowDownUp size={14} /> {asc ? 'Paling kurang dahulu' : 'Paling kerap dahulu'}
+            <p className="text-[13px] font-medium text-muted">{t('kb.count', { n: rows.length })}</p>
+            <button className="hit -me-2 gap-1.5 rounded-btn px-2 text-[13px] font-semibold text-muted hover:text-ink" onClick={() => setAsc((a) => !a)}>
+              <ArrowDownUp size={14} /> {asc ? t('kb.sortAsc') : t('kb.sortDesc')}
             </button>
           </div>
           {rows.length === 0 ? (
-            <Empty icon={BookMarked} title="Tiada kitab disenaraikan" />
+            <Empty icon={BookMarked} title={t('kb.empty')} />
           ) : (
             <ul className="card divide-y divide-line overflow-hidden">
               {rows.map((r) => {
@@ -71,20 +74,20 @@ export default function Kitab() {
                   <li key={r.id} className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3.5 sm:flex-nowrap sm:px-5">
                     <BookMarked size={20} className="shrink-0 self-start text-primary sm:self-center" strokeWidth={1.8} />
                     <div className="min-w-0 flex-1">
-                      <p className="font-semibold leading-snug text-ink wrap-anywhere">{r.nama_kitab}</p>
+                      <p dir="auto" className="font-semibold leading-snug text-ink wrap-anywhere">{r.nama_kitab}</p>
                       <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-line" aria-hidden>
                         <div className="h-full rounded-full bg-accent transition-all" style={{ width: `${(n / max) * 100}%` }} />
                       </div>
                     </div>
                     {!isAdmin && <Badge n={n} />}
                     {isAdmin && (
-                      <div className="-ml-2 flex w-full items-center justify-end gap-2 sm:ml-0 sm:w-auto">
-                        <RowActions className="mr-auto sm:order-last sm:mr-0" onEdit={() => book.setEditing(r)} onDelete={() => book.setDeleting(r)} />
-                        <button className="btn-icon border border-line" onClick={() => increment('KITAB', r.id, -1)} disabled={n <= 0} aria-label={`Kurangkan ${r.nama_kitab}`}>
+                      <div className="-ms-2 flex w-full items-center justify-end gap-2 sm:ms-0 sm:w-auto">
+                        <RowActions className="me-auto sm:order-last sm:me-0" onEdit={() => book.setEditing(r)} onDelete={() => book.setDeleting(r)} />
+                        <button className="btn-icon border border-line" onClick={() => increment('KITAB', r.id, -1)} disabled={n <= 0} aria-label={t('kb.dec', { name: r.nama_kitab })}>
                           <Minus size={15} />
                         </button>
                         <Badge n={n} />
-                        <button className="btn-icon border border-line" onClick={() => increment('KITAB', r.id, 1)} aria-label={`Tambah ${r.nama_kitab}`}>
+                        <button className="btn-icon border border-line" onClick={() => increment('KITAB', r.id, 1)} aria-label={t('kb.inc', { name: r.nama_kitab })}>
                           <Plus size={15} />
                         </button>
                       </div>
@@ -98,11 +101,11 @@ export default function Kitab() {
 
         <aside className="min-w-0 space-y-3">
           <div className="flex items-center justify-between gap-3">
-            <h3 className="text-sm font-bold uppercase tracking-wider text-muted">Skrip Promosi</h3>
-            {isAdmin && <button className="hit -mr-2 rounded-btn px-2 text-sm font-semibold text-primary hover:underline" onClick={() => script.setEditing({})}>+ Tambah skrip</button>}
+            <h3 className="text-sm font-bold uppercase tracking-wider text-muted">{t('kb.scripts')}</h3>
+            {isAdmin && <button className="hit -me-2 rounded-btn px-2 text-sm font-semibold text-primary hover:underline" onClick={() => script.setEditing({})}>{t('kb.addScript')}</button>}
           </div>
           {scripts.length === 0 ? (
-            <Empty title="Tiada skrip" hint="Admin boleh menambah pautan PDF skrip promosi." />
+            <Empty title={t('kb.noScript')} hint={t('kb.noScriptHint')} />
           ) : (
             scripts.map((s) => (
               <DriveCard key={s.id} item={s} featured isAdmin={isAdmin} onEdit={() => script.setEditing(s)} onDelete={() => script.setDeleting(s)} />
@@ -111,9 +114,9 @@ export default function Kitab() {
         </aside>
       </div>
 
-      <FormModal open={Boolean(book.editing)} onClose={() => book.setEditing(null)} title={book.editing?.id ? 'Edit Kitab' : 'Tambah Kitab'} fields={FIELDS} initial={book.editing} onSubmit={saveBook} />
-      <ConfirmModal open={Boolean(book.deleting)} onClose={() => book.setDeleting(null)} onConfirm={() => remove('KITAB', book.deleting.id)} message={`Padam “${book.deleting?.nama_kitab}”?`} />
-      <FormModal open={Boolean(script.editing)} onClose={() => script.setEditing(null)} title={script.editing?.id ? 'Edit Skrip Promosi' : 'Tambah Skrip Promosi'} fields={DRIVE_FIELDS} initial={script.editing} onSubmit={saveScript} />
+      <FormModal open={Boolean(book.editing)} onClose={() => book.setEditing(null)} title={book.editing?.id ? t('kb.edit') : t('kb.add')} fields={fields(t)} initial={book.editing} onSubmit={saveBook} />
+      <ConfirmModal open={Boolean(book.deleting)} onClose={() => book.setDeleting(null)} onConfirm={() => remove('KITAB', book.deleting.id)} message={t('ui.deleteNamed', { name: book.deleting?.nama_kitab })} />
+      <FormModal open={Boolean(script.editing)} onClose={() => script.setEditing(null)} title={script.editing?.id ? t('kb.editScript') : t('kb.addScriptTitle')} fields={driveFields(t)} initial={script.editing} onSubmit={saveScript} />
       <ConfirmModal open={Boolean(script.deleting)} onClose={() => script.setDeleting(null)} onConfirm={() => remove('PANDUAN', script.deleting.id)} />
     </section>
   );

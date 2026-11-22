@@ -40,6 +40,18 @@ body {
   min-height: 100dvh;
 }
 
+/* ---------- Arabic UI (lang="ar", dir="rtl") ---------- */
+html[lang='ar'] body { font-family: Tajawal, 'Plus Jakarta Sans', system-ui, sans-serif; }
+/* Letter-spacing breaks Arabic letter joining; uppercase is meaningless for Arabic. */
+html[lang='ar'] [class*='tracking-'] { letter-spacing: 0 !important; }
+/* Tajawal sits a little small next to Latin at the same size; slightly more line-height reads better. */
+html[lang='ar'] body { line-height: 1.6; }
+/* User content (dir="auto") keeps its own bidi order, but lines up with the RTL layout.
+   :where() = zero specificity, so explicit utilities like text-center still win. */
+:where([dir='rtl'] [dir='auto']) { text-align: right; }
+/* Directional icons (arrows/chevrons) point the reading direction. */
+[dir='rtl'] .flip-rtl { transform: scaleX(-1); }
+
 @layer components {
   .card { @apply bg-surface border border-line rounded-card shadow-soft; }
   .btn {

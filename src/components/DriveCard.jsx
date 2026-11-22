@@ -1,6 +1,7 @@
 import { Download, ExternalLink, FileText } from 'lucide-react';
 import { cx } from '../lib/utils.js';
 import { RowActions } from './ui.jsx';
+import { useI18n } from '../lib/i18n.jsx';
 
 export function driveId(url) {
   const s = String(url || '');
@@ -14,6 +15,7 @@ export function driveDownload(url) {
 
 export function DriveCard({ item, isAdmin, onEdit, onDelete, onUp, onDown, featured = false }) {
   const hasUrl = Boolean(item.gdrive_url);
+  const { t } = useI18n();
   return (
     <article
       className={cx(
@@ -26,29 +28,29 @@ export function DriveCard({ item, isAdmin, onEdit, onDelete, onUp, onDown, featu
           <FileText size={21} strokeWidth={1.8} />
         </span>
         <div className="min-w-0 flex-1">
-          <p className={cx('mb-0.5 text-xs font-bold uppercase tracking-[0.14em]', featured ? 'text-accent' : 'text-muted')}>PDF · Google Drive</p>
-          <h3 className="text-[17px] font-bold leading-snug wrap-anywhere sm:text-base">{item.tajuk}</h3>
+          <p className={cx('mb-0.5 text-xs font-bold uppercase tracking-[0.14em]', featured ? 'text-accent' : 'text-muted')}><span lang="en" dir="ltr">PDF · Google Drive</span></p>
+          <h3 dir="auto" className="text-[17px] font-bold leading-snug wrap-anywhere sm:text-base">{item.tajuk}</h3>
         </div>
       </div>
-      {item.keterangan && <p className={cx('text-[15px] leading-relaxed wrap-anywhere sm:text-sm', featured ? 'text-on-brand/80' : 'text-muted')}>{item.keterangan}</p>}
+      {item.keterangan && <p dir="auto" className={cx('text-[15px] leading-relaxed wrap-anywhere sm:text-sm', featured ? 'text-on-brand/80' : 'text-muted')}>{item.keterangan}</p>}
       <div className="mt-auto flex gap-2">
         {hasUrl ? (
           <>
             <a className="btn-gold flex-1" href={driveDownload(item.gdrive_url)} target="_blank" rel="noopener noreferrer">
-              <Download size={16} /> Muat Turun PDF
+              <Download size={16} /> {t('drive.download')}
             </a>
             <a
               className={cx('btn min-w-11 border px-3 sm:px-4', featured ? 'border-white/20 text-on-brand hover:bg-white/10' : 'border-line text-ink hover:bg-ink/5')}
               href={item.gdrive_url}
               target="_blank"
               rel="noopener noreferrer"
-              aria-label={`Lihat ${item.tajuk}`}
+              aria-label={t('drive.viewAria', { title: item.tajuk })}
             >
-              <ExternalLink size={16} /> <span className="hidden sm:inline">Lihat</span>
+              <ExternalLink size={16} className="flip-rtl" /> <span className="hidden sm:inline">{t('drive.view')}</span>
             </a>
           </>
         ) : (
-          <span className="text-sm italic opacity-70">Pautan belum ditetapkan</span>
+          <span className="text-sm italic opacity-70">{t('drive.noLink')}</span>
         )}
       </div>
       {isAdmin && (
@@ -62,12 +64,12 @@ export function DriveCard({ item, isAdmin, onEdit, onDelete, onUp, onDown, featu
   );
 }
 
-export const DRIVE_FIELDS = [
-  { name: 'tajuk', label: 'Tajuk', required: true, placeholder: 'cth. Panduan Lengkap Panel' },
-  { name: 'keterangan', label: 'Keterangan Ringkas', type: 'textarea', rows: 3, placeholder: 'Apa yang terkandung dalam dokumen ini?' },
+export const driveFields = (t) => [
+  { name: 'tajuk', label: t('drive.f.tajuk'), required: true, placeholder: t('drive.f.tajukPh') },
+  { name: 'keterangan', label: t('drive.f.ket'), type: 'textarea', rows: 3, placeholder: t('drive.f.ketPh') },
   {
-    name: 'gdrive_url', label: 'Pautan Google Drive (PDF)', type: 'url', required: true,
+    name: 'gdrive_url', label: t('drive.f.url'), type: 'url', required: true,
     placeholder: 'https://drive.google.com/file/d/…/view',
-    help: 'Pastikan perkongsian fail ditetapkan kepada “Sesiapa yang mempunyai pautan”.',
+    help: t('drive.f.urlHelp'),
   },
 ];
