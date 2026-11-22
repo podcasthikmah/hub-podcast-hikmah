@@ -83,7 +83,7 @@ export const DICT = {
     // toasts (store)
     'toast.added': 'Berjaya ditambah', 'toast.saved': 'Perubahan disimpan', 'toast.deleted': 'Rekod dipadam',
     'toast.adminOn': 'Mod Admin diaktifkan', 'toast.adminOff': 'Keluar dari Mod Admin',
-    'toast.syncFailed': 'Gagal menyegerak data. Memaparkan salinan terakhir.', 'toast.wait': 'Sila tunggu, rekod sedang disimpan…',
+    'toast.syncFailed': 'Gagal menyegerak data. Memaparkan salinan terakhir.', 'toast.wait': 'Sila tunggu, rekod sedang disimpan…', 'toast.oldBackend': 'Disimpan, tetapi terjemahan Arab tidak dijana: Apps Script yang aktif masih versi lama. Deploy → Manage deployments → New version.',
     'toast.unexpected': 'Ralat tidak dijangka',
 
     // upcoming
@@ -208,7 +208,7 @@ export const DICT = {
 
     'toast.added': 'تمت الإضافة بنجاح', 'toast.saved': 'تم حفظ التغييرات', 'toast.deleted': 'تم حذف السجل',
     'toast.adminOn': 'تم تفعيل وضع المشرف', 'toast.adminOff': 'تم الخروج من وضع المشرف',
-    'toast.syncFailed': 'تعذّرت مزامنة البيانات. تُعرض آخر نسخة محفوظة.', 'toast.wait': 'يرجى الانتظار، جارٍ حفظ السجل…',
+    'toast.syncFailed': 'تعذّرت مزامنة البيانات. تُعرض آخر نسخة محفوظة.', 'toast.wait': 'يرجى الانتظار، جارٍ حفظ السجل…', 'toast.oldBackend': 'تم الحفظ، لكن لم تُنشأ الترجمة العربية: نسخة Apps Script المنشورة قديمة. انشر نسخة جديدة (New version).',
     'toast.unexpected': 'حدث خطأ غير متوقع',
 
     'up.eyebrow': 'الجدول', 'up.title': 'البودكاست القادم',

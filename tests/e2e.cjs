@@ -795,6 +795,7 @@ async function scheduleSyncFlow(page, tag, { checkHero = false } = {}) {
       await p.goto(APP + '#upcoming');
       await synced(p);
       const S = (n) => sheet(rt, n);
+      const AR_ = (x) => `ترجمة: ${x}`;
       const textOf = async (tab) => { await go(p, tab); await p.waitForTimeout(150); return p.locator('main').innerText(); };
       const expectAll = (txt, rows, fields, label) => {
         let n = 0;
@@ -823,8 +824,11 @@ async function scheduleSyncFlow(page, tag, { checkHero = false } = {}) {
       expectAll(await textOf('peringatan'), S('PERINGATAN'), ['petikan', 'konteks'], 'Peringatan');
       // 5) Promosi Kitab (+ script card)
       txt = await textOf('kitab');
-      expectAll(txt, S('KITAB'), ['nama_kitab'], 'Kitab');
-      expectAll(txt, S('PANDUAN').filter((r) => r.kategori === 'SKRIP_PROMOSI'), ['tajuk', 'keterangan'], 'Skrip promosi');
+      // PROMOSI KITAB is never translated: book names + script card keep the uploaded text
+      for (const r of S('KITAB')) assert.ok(txt.includes(r.nama_kitab) && !(r.nama_kitab_ar && txt.includes(r.nama_kitab_ar)), `Kitab original: ${r.nama_kitab}`);
+      for (const r of S('PANDUAN').filter((x) => x.kategori === 'SKRIP_PROMOSI')) {
+        assert.ok(txt.includes(r.tajuk) && !(r.tajuk_ar && txt.includes(r.tajuk_ar)), 'Skrip promosi original title');
+      }
       // 6) Episode YT
       expectAll(await textOf('youtube'), S('YOUTUBE'), ['tajuk'], 'YouTube');
       // 7) Cadangan (suggestion + admin reply)
@@ -851,6 +855,26 @@ async function scheduleSyncFlow(page, tag, { checkHero = false } = {}) {
       assert.ok(clip.includes(`*العنوان:* ${next.tajuk_ar}`), clip);
       assert.match(clip, /\*اليوم والتاريخ:\* /);
       assert.ok(!/Tajuk:|Hari\/Tarikh/.test(clip), 'no BM labels in the Arabic message');
+
+      // NEW + EDITED entries in عربي: Arabic appears immediately (state + cache), no reload
+      await go(p, 'panduan');
+      await p.click('text=إضافة وثيقة');
+      await p.fill('#f-tajuk', 'Dokumen Baharu E2E');
+      await p.fill('#f-keterangan', 'Dokumen ini menghimpunkan 63 nama');
+      await p.fill('#f-gdrive_url', 'https://drive.google.com/file/d/1NewDocE2E/view');
+      await p.click('[role="dialog"] button:has-text("حفظ")');
+      await synced(p);
+      await p.locator('article', { hasText: 'ترجمة: Dokumen Baharu E2E' }).getByText('ترجمة: Dokumen ini menghimpunkan 63 nama').waitFor();
+      const nd = S('PANDUAN').find((r) => r.tajuk === 'Dokumen Baharu E2E');
+      assert.equal(nd.keterangan_ar, AR_('Dokumen ini menghimpunkan 63 nama'), 'new row _ar written to the Sheet');
+      await p.locator('article', { hasText: 'ترجمة: Dokumen Baharu E2E' }).getByRole('button', { name: 'تعديل' }).click();
+      await p.fill('#f-keterangan', 'Keterangan dikemas kini');
+      await p.click('[role="dialog"] button:has-text("حفظ")');
+      await synced(p);
+      await p.getByText('ترجمة: Keterangan dikemas kini').waitFor();
+      const cachedAr = await p.evaluate(() => JSON.stringify(JSON.parse(localStorage.getItem('hph_cache_v1')).data.PANDUAN));
+      assert.ok(cachedAr.includes('ترجمة: Keterangan dikemas kini'), 'edited _ar persisted to localStorage cache');
+      await go(p, 'upcoming');
 
       // instant switch: toggling language makes no network request; BM shows the originals
       let apiCalls = 0;

@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from './api.js';
-import { emptyDB } from './schema.js';
+import { emptyDB, TRANSLATED } from './schema.js';
 import { buildSeed } from './seed.js';
 import { storage, store, uid } from './utils.js';
 import { useI18n } from './i18n.jsx';
@@ -127,6 +127,12 @@ export function DataProvider({ children }) {
       return next;
     });
 
+  /** A live row saved without any `_ar` key means the deployed Code.gs predates auto-translation. */
+  const checkTranslated = (sheet, row) => {
+    if (api.mode === 'mock' || !row || !TRANSLATED[sheet]) return;
+    if (TRANSLATED[sheet].some((f) => String(row[f] || '').trim() && !(`${f}_ar` in row))) toast(t('toast.oldBackend'), 'err');
+  };
+
   const actions = useMemo(() => ({
     async create(sheet, item, msg = t('toast.added')) {
       const tempId = uid('tmp_');
@@ -139,6 +145,7 @@ export function DataProvider({ children }) {
       );
       if (!row) return null;
       replaceRow(sheet, tempId, row);
+      checkTranslated(sheet, row);
       if (isPublicCad && row?.id) {
         setMine((m) => {
           const n = { ...m, [row.id]: ownerKey };
@@ -155,7 +162,7 @@ export function DataProvider({ children }) {
         { action: 'update', sheet, id, patch, ownerKey: mine[id] },
         msg,
       );
-      if (row?.id) replaceRow(sheet, id, row);
+      if (row?.id) { replaceRow(sheet, id, row); checkTranslated(sheet, row); }
       return row;
     },
     remove(sheet, id) {

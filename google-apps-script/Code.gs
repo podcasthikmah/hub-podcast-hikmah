@@ -335,14 +335,31 @@ function onEdit(e) {
     if (!e || !e.range) return;
     var sh = e.range.getSheet();
     var name = sh.getName();
-    if (!TRANSLATE[name] || e.range.getNumRows() !== 1 || e.range.getNumColumns() !== 1 || e.range.getRow() < 2) return;
+    if (!TRANSLATE[name] || e.range.getLastRow() < 2) return;
     var header = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(function (h) { return String(h).trim(); });
-    var f = header[e.range.getColumn() - 1];
-    if (TRANSLATE[name].indexOf(f) < 0) return;
-    var dst = header.indexOf(f + '_ar');
-    if (dst < 0) return;
-    sh.getRange(e.range.getRow(), dst + 1).setValue(cell_(f + '_ar', toArabic_(e.range.getValue())));
-  } catch (err) { /* translateAllExistingRows() will catch up */ }
+    var r0 = Math.max(2, e.range.getRow()), r1 = Math.min(e.range.getLastRow(), r0 + 49); // pasted blocks: up to 50 rows
+    for (var c = e.range.getColumn(); c <= e.range.getLastColumn(); c++) {
+      var f = header[c - 1];
+      if (TRANSLATE[name].indexOf(f) < 0) continue;
+      var dst = header.indexOf(f + '_ar');
+      if (dst < 0) continue;
+      for (var r = r0; r <= r1; r++) {
+        sh.getRange(r, dst + 1).setValue(cell_(f + '_ar', toArabic_(sh.getRange(r, c).getValue())));
+      }
+    }
+  } catch (err) { /* the auto-translate timer / translateAllExistingRows() will catch up */ }
+}
+
+/**
+ * ONE-TIME SETUP (optional, recommended): run once from the editor to fill any missing Arabic
+ * every 15 minutes (rows typed/pasted into the Sheet, translation quota hiccups, …).
+ */
+function installAutoTranslate() {
+  ScriptApp.getProjectTriggers().forEach(function (t) {
+    if (t.getHandlerFunction() === 'translateAllExistingRows') ScriptApp.deleteTrigger(t);
+  });
+  ScriptApp.newTrigger('translateAllExistingRows').timeBased().everyMinutes(15).create();
+  Logger.log('Auto-translate aktif: setiap 15 minit.');
 }
 
 /**
