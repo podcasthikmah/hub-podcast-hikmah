@@ -49,6 +49,17 @@ let expectNetErrors = false;
 let rt; // emulator runtime (set in main), used by the sync-flow helpers // set during deliberate offline tests
 
 function watch(page, label) {
+  // Record every toast as it appears, so toast() can't miss one that came and went (3.2s)
+  // while the test was still busy with the previous step.
+  page.addInitScript(() => {
+    window.__toasts = [];
+    const seen = new WeakSet();
+    new MutationObserver(() => {
+      document.querySelectorAll('[role="status"]').forEach((el) => {
+        if (!seen.has(el)) { seen.add(el); window.__toasts.push({ text: el.textContent, used: false }); }
+      });
+    }).observe(document, { childList: true, subtree: true });
+  });
   page.on('pageerror', (e) => errors.push(`[${label}] pageerror: ${e.message}`));
   page.on('console', (m) => {
     if (m.type() !== 'error') return;
@@ -85,7 +96,14 @@ const sheet = (rt, name) => {
   return rows.filter((r) => r[0]).map((r) => Object.fromEntries(h.map((k, i) => [k, r[i]])));
 };
 const synced = (page) => page.waitForFunction(() => !document.querySelector('.animate-spin'), null, { timeout: 15000 });
-const toast = (page, re) => page.getByRole('status').filter({ hasText: re }).first().waitFor({ timeout: 8000 });
+/** Waits for (and consumes) the first not-yet-consumed toast matching `re`, visible or already gone. */
+const toast = (page, re) =>
+  page.waitForFunction(([src, flags]) => {
+    const rx = new RegExp(src, flags);
+    const hit = (window.__toasts || []).find((t) => !t.used && rx.test(t.text));
+    if (hit) hit.used = true;
+    return Boolean(hit);
+  }, [re.source, re.flags], { timeout: 10000 });
 
 async function adminLogin(page, pin = PIN) {
   // One-tap lock button (deterministic). The 5-tap © gesture has its own dedicated test.
@@ -778,7 +796,7 @@ async function scheduleSyncFlow(page, tag, { checkHero = false } = {}) {
       await sctx.close();
     });
 
-    await step('Translated content: all 7 sections show *_ar in عربي, BM originals in BM, fallback, WA, instant switch', async () => {
+    await step('Translated content: 6 sections show *_ar in عربي (Promosi Kitab stays original), BM originals in BM, fallback, WA, instant switch', async () => {
       // what the admin does once after deploying: translate rows created before this feature
       const res = rt.gs.translateAllExistingRows();
       assert.equal(res.failed, 0);
@@ -821,10 +839,26 @@ async function scheduleSyncFlow(page, tag, { checkHero = false } = {}) {
       expectAll(await textOf('panduan'), S('PANDUAN').filter((r) => r.kategori === 'PANEL'), ['tajuk', 'keterangan'], 'Panduan');
       // 4) Peringatan
       expectAll(await textOf('peringatan'), S('PERINGATAN'), ['petikan', 'konteks'], 'Peringatan');
-      // 5) Promosi Kitab (+ script card)
+      // 5) Promosi Kitab: book names + script cards stay EXACTLY as entered (no *_ar), static UI still Arabic
       txt = await textOf('kitab');
-      expectAll(txt, S('KITAB'), ['nama_kitab'], 'Kitab');
-      expectAll(txt, S('PANDUAN').filter((r) => r.kategori === 'SKRIP_PROMOSI'), ['tajuk', 'keterangan'], 'Skrip promosi');
+      const kitabOriginal = (rows, fields, label) => {
+        let n = 0;
+        for (const r of rows) for (const f of fields) {
+          const src = String(r[f] || '').trim();
+          const ar = String(r[`${f}_ar`] || '').trim();
+          if (!src) continue;
+          assert.ok(txt.includes(src), `${label}: shows original ${f} "${src.slice(0, 40)}"`);
+          if (ar && ar !== src) { assert.ok(!txt.includes(ar), `${label}: must not show ${f}_ar "${ar.slice(0, 40)}"`); n++; }
+        }
+        assert.ok(n > 0, `${label}: at least one row had a translation that was correctly ignored`);
+      };
+      kitabOriginal(S('KITAB'), ['nama_kitab'], 'Kitab');
+      kitabOriginal(S('PANDUAN').filter((r) => r.kategori === 'SKRIP_PROMOSI'), ['tajuk', 'keterangan'], 'Skrip promosi');
+      await p.waitForSelector('#h-kitab:has-text("التعريف بالكتب")');
+      assert.match(txt, /عدد الكتب: \d+/, 'counter still Arabic');
+      assert.ok(txt.includes('نصوص التعريف') && txt.includes('تنزيل PDF'), 'section labels/buttons still Arabic');
+      // same script in Panduan Panel's own cards keeps translating (shared DriveCard)
+      assert.ok((await textOf('panduan')).length > 0);
       // 6) Episode YT
       expectAll(await textOf('youtube'), S('YOUTUBE'), ['tajuk'], 'YouTube');
       // 7) Cadangan (suggestion + admin reply)
