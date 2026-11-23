@@ -53,6 +53,15 @@ export const DICT = {
     'demo': 'Demo',
     'admin': 'Admin', 'admin.logoutShort': 'Keluar', 'admin.logout': 'Keluar Mod Admin', 'admin.login': 'Log masuk Admin',
     'admin.banner': 'Mod Admin aktif — tambah, edit, susun & padam kandungan.',
+    'tools.title': 'Utiliti Admin', 'tools.cache': 'Kosongkan Cache & Muat Semula', 'tools.health': 'Semak Kesihatan Google Sheet',
+    'tools.cacheHint': 'Cache dikosongkan tanpa menukar bahasa atau log keluar Mod Admin.',
+    'tools.cacheDone': 'Cache dikosongkan & data terkini dimuat ({time})',
+    'tools.overall': 'Status keseluruhan:', 'tools.api': 'Sambungan API', 'tools.pin': 'ADMIN_PIN (Script Properties)',
+    'tools.pinMissing': 'Belum ditetapkan', 'tools.rows': '· {n} baris', 'tools.noTab': '· tab tiada',
+    'tools.missing': 'Lajur tiada (dicipta automatik pada simpanan seterusnya):',
+    'tools.s.ok': 'Sihat', 'tools.s.warn': 'Perlu perhatian', 'tools.s.bad': 'Bermasalah',
+    'tools.meta': 'Versi backend: {v} · Zon masa Sheet: {tz}', 'tools.tzWarn': 'Zon masa skrip ({a}) berbeza daripada Sheet ({b})',
+    'tools.oldBackend': 'Apps Script yang aktif masih versi lama. Deploy → Manage deployments → New version.',
     'load.failed': 'Tidak dapat memuatkan data', 'load.retry': 'Cuba lagi', 'load.loading': 'Memuatkan',
     'mock.notice': 'Mod Demo: data disimpan dalam pelayar ini sahaja. Sambungkan Google Apps Script di {file} untuk segerak merentas peranti.',
 
@@ -83,7 +92,7 @@ export const DICT = {
     // toasts (store)
     'toast.added': 'Berjaya ditambah', 'toast.saved': 'Perubahan disimpan', 'toast.deleted': 'Rekod dipadam',
     'toast.adminOn': 'Mod Admin diaktifkan', 'toast.adminOff': 'Keluar dari Mod Admin',
-    'toast.syncFailed': 'Gagal menyegerak data. Memaparkan salinan terakhir.', 'toast.wait': 'Sila tunggu, rekod sedang disimpan…',
+    'toast.syncFailed': 'Gagal menyegerak data. Memaparkan salinan terakhir.', 'toast.wait': 'Sila tunggu, rekod sedang disimpan…', 'toast.oldBackend': 'Disimpan, tetapi terjemahan Arab tidak dijana: Apps Script yang aktif masih versi lama. Deploy → Manage deployments → New version.',
     'toast.unexpected': 'Ralat tidak dijangka',
 
     // upcoming
@@ -183,6 +192,15 @@ export const DICT = {
     'demo': 'تجريبي',
     'admin': 'المشرف', 'admin.logoutShort': 'خروج', 'admin.logout': 'الخروج من وضع المشرف', 'admin.login': 'دخول المشرف',
     'admin.banner': 'وضع المشرف مفعّل — إضافة المحتوى وتعديله وترتيبه وحذفه.',
+    'tools.title': 'أدوات المشرف', 'tools.cache': 'مسح ذاكرة التخزين المؤقت ومزامنة', 'tools.health': 'فحص حالة جدول البيانات',
+    'tools.cacheHint': 'تُمسح الذاكرة المؤقتة دون تغيير اللغة أو الخروج من وضع المشرف.',
+    'tools.cacheDone': 'تم مسح الذاكرة المؤقتة وتحميل أحدث البيانات ({time})',
+    'tools.overall': 'الحالة العامة:', 'tools.api': 'الاتصال بالخادم', 'tools.pin': 'ADMIN_PIN (خصائص السكربت)',
+    'tools.pinMissing': 'غير مُعيَّن', 'tools.rows': '· {n} صف', 'tools.noTab': '· الورقة غير موجودة',
+    'tools.missing': 'أعمدة ناقصة (تُنشأ تلقائيًا عند الحفظ التالي):',
+    'tools.s.ok': 'سليم', 'tools.s.warn': 'يحتاج انتباهًا', 'tools.s.bad': 'به مشكلة',
+    'tools.meta': 'إصدار الخادم: {v} · المنطقة الزمنية للجدول: {tz}', 'tools.tzWarn': 'المنطقة الزمنية للسكربت ({a}) تختلف عن الجدول ({b})',
+    'tools.oldBackend': 'نسخة Apps Script المنشورة قديمة. انشر نسخة جديدة (New version).',
     'load.failed': 'تعذّر تحميل البيانات', 'load.retry': 'إعادة المحاولة', 'load.loading': 'جارٍ التحميل',
     'mock.notice': 'الوضع التجريبي: تُحفظ البيانات في هذا المتصفح فقط. اربط Google Apps Script في {file} للمزامنة بين الأجهزة.',
 
@@ -208,7 +226,7 @@ export const DICT = {
 
     'toast.added': 'تمت الإضافة بنجاح', 'toast.saved': 'تم حفظ التغييرات', 'toast.deleted': 'تم حذف السجل',
     'toast.adminOn': 'تم تفعيل وضع المشرف', 'toast.adminOff': 'تم الخروج من وضع المشرف',
-    'toast.syncFailed': 'تعذّرت مزامنة البيانات. تُعرض آخر نسخة محفوظة.', 'toast.wait': 'يرجى الانتظار، جارٍ حفظ السجل…',
+    'toast.syncFailed': 'تعذّرت مزامنة البيانات. تُعرض آخر نسخة محفوظة.', 'toast.wait': 'يرجى الانتظار، جارٍ حفظ السجل…', 'toast.oldBackend': 'تم الحفظ، لكن لم تُنشأ الترجمة العربية: نسخة Apps Script المنشورة قديمة. انشر نسخة جديدة (New version).',
     'toast.unexpected': 'حدث خطأ غير متوقع',
 
     'up.eyebrow': 'الجدول', 'up.title': 'البودكاست القادم',

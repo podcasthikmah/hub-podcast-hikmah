@@ -22,7 +22,13 @@ function createRuntime() {
   const sheets = new Map(); // name -> Sheet
   const order = [];
 
-  const store = (v) => (typeof v === 'string' && v.startsWith("'") ? v.slice(1) : v);
+  // Like Sheets: "'x" is forced text; a bare "21:00" is auto-parsed into a time-only (1899-12-30) date.
+  const store = (v) => {
+    if (typeof v !== 'string') return v;
+    if (v.startsWith("'")) return v.slice(1);
+    const t = v.match(/^(\d{1,2}):(\d{2})$/);
+    return t ? new Date(1899, 11, 30, Number(t[1]), Number(t[2])) : v;
+  };
 
   class Range {
     constructor(sh, row, col, nr = 1, nc = 1) { Object.assign(this, { sh, row, col, nr, nc }); }
@@ -60,6 +66,8 @@ function createRuntime() {
     appendRow(vals) { this.data.push(vals.map(store)); return this; }
     deleteRow(r) { this.data.splice(r - 1, 1); }
     getLastRow() { return this.data.length; }
+    getLastColumn() { return this._width(); }
+    getParent() { return ss; }
     getMaxRows() { return 1000; }
     setFrozenRows() {}
     hideColumns() {}
@@ -69,6 +77,7 @@ function createRuntime() {
     getSheetByName: (n) => sheets.get(n) || null,
     insertSheet: (n) => { const s = new Sheet(n); sheets.set(n, s); order.push(n); return s; },
     getSheets: () => order.map((n) => sheets.get(n)),
+    getSpreadsheetTimeZone: () => Intl.DateTimeFormat().resolvedOptions().timeZone,
     deleteSheet: (s) => { sheets.delete(s.name); order.splice(order.indexOf(s.name), 1); },
   };
   ss.insertSheet('Sheet1');

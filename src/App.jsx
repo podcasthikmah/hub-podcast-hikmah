@@ -1,3 +1,4 @@
+import { AdminTools } from './components/AdminTools.jsx';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Header } from './components/Header.jsx';
 import { BottomNav } from './components/BottomNav.jsx';
@@ -60,6 +61,7 @@ export default function App() {
               {t('admin.logoutShort')}
             </button>
           </div>
+          <AdminTools />
         </div>
       )}
 

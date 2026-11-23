@@ -13,9 +13,11 @@ export function driveDownload(url) {
   return id ? `https://drive.google.com/uc?export=download&id=${id}` : url;
 }
 
-export function DriveCard({ item, isAdmin, onEdit, onDelete, onUp, onDown, featured = false }) {
+export function DriveCard({ item, isAdmin, onEdit, onDelete, onUp, onDown, featured = false, original = false }) {
   const hasUrl = Boolean(item.gdrive_url);
-  const { t, tr } = useI18n();
+  const { t, tr: trAr } = useI18n();
+  // PROMOSI KITAB scripts always show the uploaded text (never the Arabic translation)
+  const tr = original ? (row, f) => (row ? row[f] || '' : '') : trAr;
   return (
     <article
       className={cx(

@@ -500,6 +500,85 @@ async function scheduleSyncFlow(page, tag, { checkHero = false } = {}) {
       await b.locator('text=akan dilaksanakan').waitFor();
     });
 
+    await step('Waktu Shooting via Edit Panel -> Hero, Upcoming card, Salin Info WA (BM + عربي); clearing it leaves no separator', async () => {
+      await adminLogin(page);
+      await page.waitForSelector('[data-testid="admin-banner"]');
+      rt.cache.clear();
+      const S = () => sheet(rt, 'PANEL').filter((r) => isDatedStr(r.tarikh) && r.tarikh >= iso(0))
+        .sort((a, b) => a.tarikh.localeCompare(b.tarikh) || String(a.masa || '99').localeCompare(String(b.masa || '99')) || a.tajuk.localeCompare(b.tajuk));
+      const target = S()[0];
+      const slotRows = sheet(rt, 'PANEL').filter((r) => r.tajuk === target.tajuk && r.tarikh === target.tarikh);
+      const editMasa = async (id, v) => {
+        await go(page, 'panel');
+        await page.locator(`li[data-panel-id="${id}"]`).getByRole('button', { name: /^(Edit|تعديل)$/ }).click();
+        await page.fill('#f-masa', v);
+        await page.getByRole('dialog').getByRole('button', { name: /^(Simpan|حفظ)$/ }).click();
+        await synced(page);
+      };
+      const original = slotRows.map((r) => [r.id, r.masa]);
+      for (const r of slotRows) if (r.masa) await editMasa(r.id, ''); // start from "no time"
+      await go(page, 'upcoming');
+      assert.ok(!/·/.test(await page.getByTestId('hero-when').innerText()), 'no dangling separator without a time');
+      assert.equal(await page.locator('[data-slot]').first().getByTestId('slot-masa').count(), 0);
+
+      await editMasa(slotRows[0].id, '06:00'); // early, so this slot stays the nearest
+      assert.equal(sheet(rt, 'PANEL').find((r) => r.id === slotRows[0].id).masa, '06:00', 'saved to the PANEL tab');
+      await go(page, 'upcoming');
+      assert.match(await page.getByTestId('hero-when').innerText(), / · 6:00 pagi$/, 'Hero');
+      const card = page.locator('[data-slot]').first();
+      assert.equal(await card.getByTestId('slot-masa').innerText(), '6:00 pagi', 'Upcoming card');
+      await card.getByRole('button', { name: 'Salin Info WA' }).click();
+      assert.ok((await page.evaluate(() => navigator.clipboard.readText())).includes('⏰ *Masa:* 6:00 pagi'), 'WA (BM)');
+
+      await page.click('[data-lang-option="ar"]');
+      assert.match(await page.getByTestId('hero-when').innerText(), / · 6:00 صباحًا$/, 'Hero (AR)');
+      assert.equal(await card.getByTestId('slot-masa').innerText(), '6:00 صباحًا', 'card (AR)');
+      await card.getByRole('button', { name: 'نسخ رسالة واتساب' }).click();
+      assert.ok((await page.evaluate(() => navigator.clipboard.readText())).includes('⏰ *الوقت:* 6:00 صباحًا'), 'WA (AR)');
+      // re-opening the Edit modal shows the saved time (it used to show --:-- and wipe it on Save)
+      await go(page, 'panel');
+      await page.locator(`li[data-panel-id="${slotRows[0].id}"]`).getByRole('button', { name: 'تعديل' }).click();
+      assert.equal(await page.inputValue('#f-masa'), '06:00');
+      await page.keyboard.press('Escape');
+      await page.click('[data-lang-option="ms"]');
+      for (const [id, m] of original) await editMasa(id, m || ''); // restore the seeded times
+    });
+
+    await step('Utiliti Admin: clear cache keeps language + admin session; Sheet health report (BM + عربي)', async () => {
+      const tools = page.getByTestId('admin-tools');
+      await tools.getByRole('button', { name: /Utiliti Admin/ }).click();
+      await page.evaluate(() => localStorage.setItem('hph_cache_v1', JSON.stringify({ data: { PANEL: [] }, at: '2000-01-01' })));
+      await tools.getByRole('button', { name: 'Kosongkan Cache & Muat Semula' }).click();
+      await toast(page, /Cache dikosongkan & data terkini dimuat \(/);
+      const st = await page.evaluate(() => ({ cache: JSON.parse(localStorage.getItem('hph_cache_v1')), lang: localStorage.getItem('hph_lang'), pin: sessionStorage.getItem('hph_admin_pin') }));
+      assert.ok(st.cache.data.PANEL.length > 0 && st.cache.at !== '2000-01-01', 'fresh data re-cached');
+      assert.equal(st.lang, 'ms');
+      assert.ok(st.pin, 'still admin');
+      await page.waitForSelector('[data-testid="admin-banner"]');
+
+      await tools.getByRole('button', { name: 'Semak Kesihatan Google Sheet' }).click();
+      const rep = page.getByTestId('health-report');
+      await rep.waitFor();
+      assert.match(await rep.innerText(), /Sambungan API \(\d+ ms\)/);
+      for (const n of ['UPCOMING', 'PANEL', 'PANDUAN', 'PERINGATAN', 'KITAB', 'YOUTUBE', 'CADANGAN']) await rep.locator(`[data-tab="${n}"]`).waitFor();
+      assert.equal(await rep.locator('[data-tab="PANEL"] [data-tone]').getAttribute('data-tone'), 'ok');
+      // a renamed/missing column turns that tab amber and names the column
+      const sh = rt.sheets.get('PANEL'); const iM = sh.data[0].indexOf('masa');
+      sh.data[0][iM] = 'waktu';
+      await page.click('[data-lang-option="ar"]');
+      await tools.getByRole('button', { name: 'فحص حالة جدول البيانات' }).click();
+      await rep.locator('[data-tab="PANEL"] [data-tone="warn"]').waitFor();
+      assert.match(await rep.locator('[data-tab="PANEL"]').innerText(), /masa/);
+      assert.match(await rep.innerText(), /الحالة العامة:\s*يحتاج انتباهًا/);
+      sh.data[0][iM] = 'masa';
+      await tools.getByRole('button', { name: 'مسح ذاكرة التخزين المؤقت ومزامنة' }).click();
+      await toast(page, /تم مسح الذاكرة المؤقتة/);
+      assert.equal(await page.evaluate(() => localStorage.getItem('hph_lang')), 'ar', 'language kept');
+      await page.click('[data-lang-option="ms"]');
+      await page.click('button[title="Keluar Mod Admin"]');
+      assert.equal(await page.getByTestId('admin-tools').count(), 0, 'tools hidden outside Admin Mode');
+    });
+
     await step('Stale PIN: admin action after PIN change -> error + auto logout', async () => {
       await adminLogin(page);
       await page.waitForSelector('[data-testid="admin-banner"]');
@@ -795,6 +874,7 @@ async function scheduleSyncFlow(page, tag, { checkHero = false } = {}) {
       await p.goto(APP + '#upcoming');
       await synced(p);
       const S = (n) => sheet(rt, n);
+      const AR_ = (x) => `ترجمة: ${x}`;
       const textOf = async (tab) => { await go(p, tab); await p.waitForTimeout(150); return p.locator('main').innerText(); };
       const expectAll = (txt, rows, fields, label) => {
         let n = 0;
@@ -823,14 +903,26 @@ async function scheduleSyncFlow(page, tag, { checkHero = false } = {}) {
       expectAll(await textOf('peringatan'), S('PERINGATAN'), ['petikan', 'konteks'], 'Peringatan');
       // 5) Promosi Kitab (+ script card)
       txt = await textOf('kitab');
-      expectAll(txt, S('KITAB'), ['nama_kitab'], 'Kitab');
-      expectAll(txt, S('PANDUAN').filter((r) => r.kategori === 'SKRIP_PROMOSI'), ['tajuk', 'keterangan'], 'Skrip promosi');
+      // PROMOSI KITAB is never translated: book names + script card keep the uploaded text
+      for (const r of S('KITAB')) assert.ok(txt.includes(r.nama_kitab) && !(r.nama_kitab_ar && txt.includes(r.nama_kitab_ar)), `Kitab original: ${r.nama_kitab}`);
+      for (const r of S('PANDUAN').filter((x) => x.kategori === 'SKRIP_PROMOSI')) {
+        assert.ok(txt.includes(r.tajuk) && !(r.tajuk_ar && txt.includes(r.tajuk_ar)), 'Skrip promosi original title');
+      }
       // 6) Episode YT
       expectAll(await textOf('youtube'), S('YOUTUBE'), ['tajuk'], 'YouTube');
       // 7) Cadangan (suggestion + admin reply)
       txt = await textOf('cadangan');
       expectAll(txt, S('CADANGAN'), ['catatan'], 'Cadangan catatan');
       expectAll(txt, S('CADANGAN'), ['balasan_admin'], 'Cadangan reply');
+      {
+        const r = S('CADANGAN').find((x) => x.balasan_admin === 'Baik, akan dilaksanakan bulan depan.');
+        assert.ok(r && r.balasan_admin_ar, 'admin reply saved with balasan_admin_ar');
+        const card = p.locator('li', { hasText: r.catatan_ar || r.catatan });
+        const box = await card.innerText();
+        assert.ok(box.includes(r.catatan_ar) && box.includes(r.balasan_admin_ar), 'suggestion + admin reply both in Arabic');
+        assert.equal((await card.locator('p').last().innerText()).trim(), r.balasan_admin_ar, 'reply box renders balasan_admin_ar, not the Malay');
+        await card.screenshot({ path: process.env.CADANGAN_AR_SHOT || '/dev/null' }).catch(() => {});
+      }
 
       // Salin Info WA follows the UI language
       await adminLogin(p);
@@ -842,6 +934,26 @@ async function scheduleSyncFlow(page, tag, { checkHero = false } = {}) {
       assert.ok(clip.includes(`*العنوان:* ${next.tajuk_ar}`), clip);
       assert.match(clip, /\*اليوم والتاريخ:\* /);
       assert.ok(!/Tajuk:|Hari\/Tarikh/.test(clip), 'no BM labels in the Arabic message');
+
+      // NEW + EDITED entries in عربي: Arabic appears immediately (state + cache), no reload
+      await go(p, 'panduan');
+      await p.click('text=إضافة وثيقة');
+      await p.fill('#f-tajuk', 'Dokumen Baharu E2E');
+      await p.fill('#f-keterangan', 'Dokumen ini menghimpunkan 63 nama');
+      await p.fill('#f-gdrive_url', 'https://drive.google.com/file/d/1NewDocE2E/view');
+      await p.click('[role="dialog"] button:has-text("حفظ")');
+      await synced(p);
+      await p.locator('article', { hasText: 'ترجمة: Dokumen Baharu E2E' }).getByText('ترجمة: Dokumen ini menghimpunkan 63 nama').waitFor();
+      const nd = S('PANDUAN').find((r) => r.tajuk === 'Dokumen Baharu E2E');
+      assert.equal(nd.keterangan_ar, AR_('Dokumen ini menghimpunkan 63 nama'), 'new row _ar written to the Sheet');
+      await p.locator('article', { hasText: 'ترجمة: Dokumen Baharu E2E' }).getByRole('button', { name: 'تعديل' }).click();
+      await p.fill('#f-keterangan', 'Keterangan dikemas kini');
+      await p.click('[role="dialog"] button:has-text("حفظ")');
+      await synced(p);
+      await p.getByText('ترجمة: Keterangan dikemas kini').waitFor();
+      const cachedAr = await p.evaluate(() => JSON.stringify(JSON.parse(localStorage.getItem('hph_cache_v1')).data.PANDUAN));
+      assert.ok(cachedAr.includes('ترجمة: Keterangan dikemas kini'), 'edited _ar persisted to localStorage cache');
+      await go(p, 'upcoming');
 
       // instant switch: toggling language makes no network request; BM shows the originals
       let apiCalls = 0;
@@ -902,7 +1014,7 @@ async function scheduleSyncFlow(page, tag, { checkHero = false } = {}) {
     app.close();
   }
 })().catch((e) => {
-  console.error('\n✗', e.message);
+  console.error('\n✗', e.message, process.env.E2E_STACK ? e.stack : '');
   if (errors.length) console.error('console errors:\n' + errors.join('\n'));
   process.exit(1);
 });
