@@ -42,6 +42,7 @@ Object.keys(TRANSLATE).forEach(function (name) {
   TRANSLATE[name].forEach(function (f) { HEADERS[name].push(f + '_ar'); });
 });
 
+var BACKEND_VERSION = '2026.11.23';
 var HIDDEN_COLS = { owner_hash: true };       // never sent to the browser
 var NUMERIC_COLS = { order: true, bilangan: true };
 var PUBLIC_EDIT_FIELDS = ['tarikh', 'catatan']; // what a public owner may change in CADANGAN
@@ -88,6 +89,11 @@ function handle_(p) {
   if (action === 'verifyPin') {
     requireAdmin_(p.pin);
     return { admin: true };
+  }
+
+  if (action === 'health') {
+    requireAdmin_(p.pin);
+    return health_();
   }
 
   var sheet = String(p.sheet || '');
@@ -141,6 +147,7 @@ function readSheet_(name) {
     values = sh.getDataRange().getValues();
   }
   var tz = Session.getScriptTimeZone();
+  var sheetTz = sh.getParent().getSpreadsheetTimeZone() || tz; // time-only cells are stored in the Sheet's zone
   var rows = [];
   for (var i = 1; i < values.length; i++) {
     var row = values[i];
@@ -149,11 +156,12 @@ function readSheet_(name) {
     header.forEach(function (h, c) {
       if (!h) return;
       var v = row[c];
-      if (v instanceof Date) {
+      if (Object.prototype.toString.call(v) === '[object Date]') {
         // A time typed into a non-text cell (e.g. "21:00") comes back as a 1899-12-30 date: keep the time.
-        if (v.getFullYear() < 1900 || h === 'masa') v = Utilities.formatDate(v, tz, 'HH:mm');
+        if (v.getFullYear() < 1900 || h === 'masa') v = Utilities.formatDate(v, sheetTz, 'HH:mm');
         else v = Utilities.formatDate(v, tz, h === 'created_at' ? "yyyy-MM-dd'T'HH:mm:ss" : 'yyyy-MM-dd');
       }
+      if (h === 'masa') v = masa_(v);
       if (NUMERIC_COLS[h]) v = Number(v) || 0;
       else v = v === null || v === undefined ? '' : String(v);
       obj[h] = v;
@@ -449,6 +457,30 @@ function rateLimit_(key, max, msg) {
 }
 
 // ---- Helpers ---------------------------------------------------------------
+/**
+ * Admin "Semak Kesihatan Google Sheet": tabs, row counts, missing columns, PIN, time zones.
+ * Read-only: never creates tabs or columns.
+ */
+var HEALTH_TABS = ['UPCOMING', 'PANEL', 'PANDUAN', 'PERINGATAN', 'KITAB', 'YOUTUBE', 'CADANGAN'];
+function health_() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var tabs = HEALTH_TABS.map(function (name) {
+    var sh = ss.getSheetByName(name);
+    if (!sh) return { name: name, exists: false, rows: 0, missing: HEADERS[name] || [] };
+    var lastCol = Math.max(sh.getLastColumn(), 1);
+    var header = sh.getRange(1, 1, 1, lastCol).getValues()[0].map(function (h) { return String(h).trim(); });
+    return { name: name, exists: true, rows: Math.max(sh.getLastRow() - 1, 0), missing: missingHeaders_(name, header) };
+  });
+  return {
+    version: BACKEND_VERSION,
+    pinSet: Boolean(getPin_()),
+    scriptTz: Session.getScriptTimeZone(),
+    sheetTz: ss.getSpreadsheetTimeZone(),
+    tabs: tabs,
+    at: Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd'T'HH:mm:ss")
+  };
+}
+
 function getSheet_(name) {
   var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(name);
   if (!sh) throw new Error('Tab "' + name + '" tidak dijumpai. Jalankan setupSheets() dahulu.');
@@ -462,9 +494,25 @@ function findRow_(data, id) {
 }
 
 /** Sanitise a value before writing: cap length & neutralise spreadsheet formula injection. */
+/**
+ * Shooting time -> 'HH:mm' (24h) or ''. Accepts '21:00', '9:00 PM', '9.00 malam', '21:00:00'.
+ */
+function masa_(v) {
+  var s = String(v == null ? '' : v).trim().toLowerCase();
+  var m = s.match(/^(\d{1,2})[:.](\d{2})(?::\d{2})?\s*(am|pm|pagi|tengah hari|petang|malam|ptg|mlm)?$/);
+  if (!m) return '';
+  var h = Number(m[1]), min = Number(m[2]), p = m[3] || '';
+  if (/^(pm|petang|ptg|malam|mlm)$/.test(p) && h < 12) h += 12;
+  if (/^(am|pagi)$/.test(p) && h === 12) h = 0;
+  if (h > 23 || min > 59) return '';
+  return (h < 10 ? '0' : '') + h + ':' + m[2];
+}
+
 function cell_(header, v) {
   if (v === undefined || v === null) return '';
   if (NUMERIC_COLS[header]) return Number(v) || 0;
+  // Leading apostrophe = stored as plain text, so Sheets never turns it into a timezone-shifted time value.
+  if (header === 'masa') { var t = masa_(v); return t ? "'" + t : ''; }
   var s = String(v).slice(0, LIMITS.MAX_TEXT);
   if (/^[=+\-@]/.test(s)) s = "'" + s;
   return s;

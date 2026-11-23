@@ -76,6 +76,13 @@ async function mockPost(p) {
   const db = mockDB();
   if (p.pin && p.pin !== CONFIG.MOCK_ADMIN_PIN) throw new Error('PIN salah');
   const isAdmin = Boolean(p.pin);
+  if (p.action === 'health') {
+    if (!isAdmin) throw new Error('Akses admin diperlukan');
+    const tabs = ['UPCOMING', 'PANEL', 'PANDUAN', 'PERINGATAN', 'KITAB', 'YOUTUBE', 'CADANGAN']
+      .map((name) => ({ name, exists: true, rows: (db[name] || []).length, missing: [] }));
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    return { version: 'mock', pinSet: true, scriptTz: tz, sheetTz: tz, tabs, at: new Date().toISOString() };
+  }
   const rows = db[p.sheet];
   if (p.action !== 'verifyPin' && !rows) throw new Error('Sheet tidak sah');
   const find = () => {

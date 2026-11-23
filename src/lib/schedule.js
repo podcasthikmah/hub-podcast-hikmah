@@ -22,10 +22,14 @@ export function formatTarikhHari(t, { short = false } = {}) {
 
 /** 'HH:mm' (24h) when the value is a recognisable time ('21:00', '9:05', '21.30'), else ''. */
 export function normalizeMasa(m) {
-  const x = String(m ?? '').trim().match(/^(\d{1,2})[:.](\d{2})(?::\d{2})?$/);
+  // '21:00' · '21:00:00' · '9.00' · '9:00 PM' · '9:00 malam' -> '21:00' (mirrors masa_() in Code.gs)
+  const x = String(m ?? '').trim().toLowerCase()
+    .match(/^(\d{1,2})[:.](\d{2})(?::\d{2})?\s*(am|pm|pagi|tengah hari|petang|malam|ptg|mlm)?$/);
   if (!x) return '';
-  const h = Number(x[1]);
+  let h = Number(x[1]);
   const min = Number(x[2]);
+  if (/^(pm|petang|ptg|malam|mlm)$/.test(x[3] || '') && h < 12) h += 12;
+  if (/^(am|pagi)$/.test(x[3] || '') && h === 12) h = 0;
   if (h > 23 || min > 59) return '';
   return `${String(h).padStart(2, '0')}:${x[2]}`;
 }

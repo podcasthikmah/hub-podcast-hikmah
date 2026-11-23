@@ -20,7 +20,7 @@ function readPin() {
 }
 
 export function DataProvider({ children }) {
-  const { t, serverError } = useI18n();
+  const { t, serverError, lang } = useI18n();
   // refresh() reads t via a ref so a language switch doesn't recreate it (and re-fetch).
   const tRef = useRef(t);
   tRef.current = t;
@@ -54,9 +54,11 @@ export function DataProvider({ children }) {
       setLastSync(at);
       setHasData(true);
       setError(null);
+      return true;
     } catch (e) {
       setError(e.message || 'Gagal menyegerak');
       if (!silent) toast(tRef.current('toast.syncFailed'), 'err');
+      return false;
     } finally {
       setSyncing(false);
     }
@@ -213,11 +215,27 @@ export function DataProvider({ children }) {
     toast(t('toast.adminOff'));
   }, [toast, t]);
 
+  /** Admin tool: wipe the app's cached data (keeps language, admin session & "my suggestions"), then refetch. */
+  const clearCache = useCallback(async () => {
+    try { localStorage.removeItem(CACHE_KEY); } catch { /* noop */ }
+    setLastSync(null);
+    const ok = await refresh({ silent: false });
+    if (ok) toast(t('tools.cacheDone', { time: new Date().toLocaleTimeString(lang === 'ar' ? 'ar' : 'ms-MY', { hour: 'numeric', minute: '2-digit', second: '2-digit' }) }));
+    return ok;
+  }, [refresh, toast, t, lang]);
+
+  /** Admin tool: backend health report + round-trip latency. */
+  const health = useCallback(async () => {
+    const t0 = performance.now();
+    const data = await api.post({ action: 'health', pin });
+    return { ...data, latency: Math.round(performance.now() - t0) };
+  }, [pin]);
+
   const value = {
     db, syncing, error, lastSync, hasData, mode: api.mode,
     isAdmin: Boolean(pin), login, logout,
     isMine: (id) => Boolean(mine[id]),
-    refresh, toast, ...actions,
+    refresh, toast, clearCache, health, ...actions,
   };
 
   return (

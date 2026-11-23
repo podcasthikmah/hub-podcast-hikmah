@@ -284,6 +284,36 @@ const test = async (name, fn) => { await fn(); passed++; console.log('  ✓', na
       assert.equal(u.nama_kitab_ar, AR('Al-Hikam Syarah'));
     });
 
+    await test('PANEL masa: stored as text "HH:mm", read back clean (incl. Sheet time cells & 12h text), cleared when empty', async () => {
+      const p = ok(await post({ action: 'create', sheet: 'PANEL', pin: PIN, item: { tajuk: 'Masa Test', nama_panel: 'Ustaz M', tarikh: '2030-01-05', masa: '21:00' } }));
+      assert.equal(p.masa, '21:00');
+      assert.equal(cell('PANEL', p.id, 'masa'), '21:00', 'written as text, not a Date');
+      const sh = rt.sheets.get('PANEL'); const iM = sh.data[0].indexOf('masa');
+      const row = sh.data.find((r) => r[0] === p.id);
+      row[iM] = new Date(1899, 11, 30, 20, 30); // admin typed 20:30 straight into the Sheet
+      let all = (await (await fetch(`${URL_}?action=getAll`)).json()).data;
+      assert.equal(all.PANEL.find((r) => r.id === p.id).masa, '20:30');
+      row[iM] = '9:15 PM';
+      all = (await (await fetch(`${URL_}?action=getAll`)).json()).data;
+      assert.equal(all.PANEL.find((r) => r.id === p.id).masa, '21:15');
+      const u = ok(await post({ action: 'update', sheet: 'PANEL', id: p.id, pin: PIN, patch: { masa: '' } }));
+      assert.equal(u.masa, '');
+      ok(await post({ action: 'delete', sheet: 'PANEL', id: p.id, pin: PIN }));
+    });
+
+    await test('health: admin-only report of tabs, rows, missing columns, PIN', async () => {
+      assert.equal((await post({ action: 'health' })).ok, false, 'public cannot run health');
+      const h = ok(await post({ action: 'health', pin: PIN }));
+      assert.equal(h.pinSet, true);
+      assert.deepEqual(h.tabs.map((t) => t.name), ['UPCOMING', 'PANEL', 'PANDUAN', 'PERINGATAN', 'KITAB', 'YOUTUBE', 'CADANGAN']);
+      const panel = h.tabs.find((t) => t.name === 'PANEL');
+      assert.ok(panel.exists && panel.rows > 0 && panel.missing.length === 0, JSON.stringify(panel));
+      const sh = rt.sheets.get('PANEL'); const iM = sh.data[0].indexOf('masa');
+      sh.data[0][iM] = 'waktu'; // a renamed header is reported, not silently "fixed"
+      assert.deepEqual(ok(await post({ action: 'health', pin: PIN })).tabs.find((t) => t.name === 'PANEL').missing, ['masa']);
+      sh.data[0][iM] = 'masa';
+    });
+
     await test('CADANGAN admin reply: saved reply gets balasan_admin_ar; backfill fixes missing/untranslated replies', async () => {
       const c = ok(await post({ action: 'create', sheet: 'CADANGAN', item: { catatan: 'Suara panel kurang jelas' } }));
       const u = ok(await post({ action: 'update', sheet: 'CADANGAN', id: c.id, pin: PIN, patch: { balasan_admin: 'Baik kami ambil maklum', status: 'SELESAI' } }));
