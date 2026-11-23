@@ -8,7 +8,7 @@
  */
 export const CONFIG = {
   // e.g. 'https://script.google.com/macros/s/AKfycb.../exec'
-  GAS_URL: 'https://script.google.com/macros/s/AKfycby6DMkwAEFiQoAvJruF2066l57sVpJd1SWdAPG9Bop1eMD8fgHA_cHopX2dUEsSLd9E/exec',
+  GAS_URL: 'https://script.google.com/macros/s/AKfycbwJTyO7LnzXZedB1iZUalm6mKpYlVduWQSghit2XomWcHpohsKZ2cyeQekM1g12DsOa/exec',
 
   // Public link included in "Salin Info WA" messages.
   // Leave empty to auto-use the current page address.
