@@ -30,8 +30,8 @@ export function AdminTools() {
   const runHealth = async () => {
     setBusy('health'); setErr(''); setReport(null);
     try { setReport(await health()); } catch (e) {
-      // a Code.gs deployed before this feature answers "Tindakan tidak dikenali"
-      setErr(/tidak dikenali/i.test(e.message) ? t('tools.oldBackend') : serverError(e.message) || e.message);
+      // a Code.gs deployed before this feature answers "Tindakan tidak dikenali" / "Sheet tidak sah"
+      setErr(/tidak dikenali|Sheet tidak sah/i.test(e.message) ? t('tools.oldBackend') : serverError(e.message) || e.message);
     } finally { setBusy(''); }
   };
 

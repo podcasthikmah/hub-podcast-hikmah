@@ -575,6 +575,14 @@ async function scheduleSyncFlow(page, tag, { checkHero = false } = {}) {
       await toast(page, /تم مسح الذاكرة المؤقتة/);
       assert.equal(await page.evaluate(() => localStorage.getItem('hph_lang')), 'ar', 'language kept');
       await page.click('[data-lang-option="ms"]');
+      // old deployed Code.gs (no "health" action) -> clear "deploy a New version" hint, not "Sheet tidak sah"
+      const old = (route) => (/"action":"health"/.test(route.request().postData() || '')
+        ? route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: false, error: 'Sheet tidak sah' }) })
+        : route.fallback());
+      await page.route(/\/exec/, old);
+      await tools.getByRole('button', { name: 'Semak Kesihatan Google Sheet' }).click();
+      await tools.getByText(/Apps Script yang aktif masih versi lama/).waitFor();
+      await page.unroute(/\/exec/, old);
       await page.click('button[title="Keluar Mod Admin"]');
       assert.equal(await page.getByTestId('admin-tools').count(), 0, 'tools hidden outside Admin Mode');
     });
